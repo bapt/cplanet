@@ -122,13 +122,13 @@ convert_to_Unicode(char *source_encoding, char *str)
 int 
 get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 {
-    mrss_t *flux;
+    mrss_t *feed;
     mrss_error_t ret;
     mrss_item_t *item;
     CURLcode code;
     char *encoding;
     char *name=hdf_get_valuef(hdf_cfg,"Name");
-    ret = mrss_parse_url_with_options_and_error (hdf_get_valuef(hdf_cfg,"URL"), &flux, NULL, &code);
+    ret = mrss_parse_url_with_options_and_error (hdf_get_valuef(hdf_cfg,"URL"), &feed, NULL, &code);
     if(ret)
     {
 	warn( "MRSS return error: %s, %s\n",
@@ -137,8 +137,8 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 		mrss_strerror (ret),name);
 	return pos;
     }
-    encoding=flux->encoding;
-    for (item = flux->item;item;item=item->next)
+    encoding=feed->encoding;
+    for (item = feed->item;item;item=item->next)
     {
 	struct tm date;
 	time_t t;
@@ -154,14 +154,14 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 	mrss_category_t *tags;
 	mrss_tag_t *content; 
 	hdf_set_valuef(hdf_dest,"CPlanet.Posts.%i.Name=%s",pos,name);
-	hdf_set_valuef(hdf_dest,"CPlanet.Posts.%i.FluxName=%s",pos,convert_to_Unicode(encoding,flux->title));
+	hdf_set_valuef(hdf_dest,"CPlanet.Posts.%i.FeedName=%s",pos,convert_to_Unicode(encoding,feed->title));
 	if(item->author != NULL)
 	    hdf_set_valuef(hdf_dest,"CPlanet.Posts.%i.Author=%s",pos,convert_to_Unicode(encoding,item->author));
 	hdf_set_valuef(hdf_dest,"CPlanet.Posts.%i.Title=%s",pos,convert_to_Unicode(encoding,item->title));
 	hdf_set_valuef(hdf_dest,"CPlanet.Posts.%i.Link=%s",pos,item->link);
 	hdf_set_valuef(hdf_dest,"CPlanet.Posts.%i.Date=%s",pos,item->pubDate);
 	/* Description is only for description tag, we want content if exists */
-	if(flux->version == MRSS_VERSION_ATOM_0_3 || flux->version == MRSS_VERSION_ATOM_1_0 ) {
+	if(feed->version == MRSS_VERSION_ATOM_0_3 || feed->version == MRSS_VERSION_ATOM_1_0 ) {
 	    if ((mrss_search_tag(item, "content", "http://www.w3.org/2005/Atom", &content) == MRSS_OK && content) || 
 		    (mrss_search_tag(item, "content", "http://purl.org/atom/ns#", &content) == MRSS_OK && content)) {
 		hdf_set_valuef(hdf_dest,"CPlanet.Posts.%i.Description=%s",pos,convert_to_Unicode(encoding,content->value));
@@ -204,7 +204,7 @@ main (int argc, char *argv[])
     CSPARSE *parse;
     STRING cs_output_data;
     HDF *hdf;
-    HDF *flux_hdf;
+    HDF *feed_hdf;
     int pos=0;
     int days=0;
     int ch=0;
@@ -234,7 +234,7 @@ main (int argc, char *argv[])
 	nerr_log_error(err);
 	return -1;
     }
-    err = hdf_init(&flux_hdf);
+    err = hdf_init(&feed_hdf);
 
     /* Read the hdf file */
     err = hdf_read_file(hdf,hdf_file);
@@ -247,10 +247,10 @@ main (int argc, char *argv[])
     cs_output = hdf_get_valuef(hdf,"CPlanet.Path");
     days = atoi(hdf_get_valuef(hdf,"CPlanet.Days"));
     days = days * 24 * 60 * 60;
-    flux_hdf = hdf_get_obj(hdf,"CPlanet.Flux.0");
-    pos=get_posts(flux_hdf,hdf,pos, days);
-    while ((flux_hdf = hdf_obj_next(flux_hdf)) != NULL) {
-	pos=get_posts(flux_hdf,hdf,pos, days);
+    feed_hdf = hdf_get_obj(hdf,"CPlanet.Feed.0");
+    pos=get_posts(feed_hdf,hdf,pos, days);
+    while ((feed_hdf = hdf_obj_next(feed_hdf)) != NULL) {
+	pos=get_posts(feed_hdf,hdf,pos, days);
     }
     hdf_sort_obj(hdf_get_obj(hdf,"CPlanet.Posts"),sort_obj_by_date);
     /*	hdf_dump(hdf,NULL); */
@@ -278,6 +278,6 @@ main (int argc, char *argv[])
     cs_destroy(&parse);
     /*create_atom(hdf);*/
     hdf_destroy(&hdf);
-    hdf_destroy(&flux_hdf);
+    hdf_destroy(&feed_hdf);
     return 0;
 }

@@ -1,11 +1,11 @@
 CPlanet {
 	Name = Planet BSD Francophone
 	Description = Planet regroupant sites et blogs des BSDistes francophones actifs
-	Path = /home/bapt/planet/www/index.html
-	TemplatePath = /home/bapt/cplanet/cplanet.cs
+	Path = ./samples/index.html
+	TemplatePath = ./samples/cplanet.cs
 	URL = http://planet.etoilebsd.net
 	Days = 7
-	Flux {
+	Feed {
 		0 {
 			Name = GCU
 			Home = http://www.gcu.info

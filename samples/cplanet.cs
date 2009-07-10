@@ -15,7 +15,7 @@
 	    <div id="menu">
 		<h2>Subscriptions</h2>
 		<ul>
-		    <?cs each:flux = CPlanet.Flux ?>
+		    <?cs each:flux = CPlanet.Feed ?>
 		    <li><a href="<?cs var:flux.Home ?>"> <?cs var:flux.Name ?></a></li>
 		    <?cs /each ?>
 		</ul>
@@ -25,7 +25,7 @@
 		<br />
 		<div id="date"><?cs var:post.Date ?></div>
 		<p>
-		<h2 id="story-title"><a href="<?cs var:post.Link ?>"><?cs var:post.FluxName ?> >> <?cs var:post.Title ?></a></h2>
+		<h2 id="story-title"><a href="<?cs var:post.Link ?>"><?cs var:post.FeedName ?> >> <?cs var:post.Title ?></a></h2>
 		<div id="comments"><?cs if:post.Author ?>Par : <?cs var:post.Author  ?> <?cs /if ?></div>
 		<div id="comments">Tags: <?cs each:tags = post.Tags ?><div id="tags"><?cs var:tags.Tag ?></div> <?cs /each ?><?cs if:post.Permalink ?>| <a href="<?cs var:post.Permalink ?>">permalink</a><?cs /if ?></div>
 		<p><?cs var:post.Description ?></p>

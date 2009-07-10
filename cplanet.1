@@ -1,0 +1,28 @@
+.TH \fICPlanet\fR 0.1 "Jul 10, 2009" " " "\fICPlanet\fR"
+.SH NAME
+\fICPlanet\fR - a RSS Feed Aggregator to generate a planet
+.SH SYNOPSIS
+cplanet -c file.hdf
+.SH DESCRIPTION
+\fICPlanet\fR is a RSS/ATOM feed aggregator written in C that generate static html
+files.
+.br
+\fICPlanet\fR uses clearsilver as a template engine and hdf (from clearsilver) as a
+configureation file.
+.br
+You can do what ever you wants in the HDF file but some options are mandatory:
+.br
+.br 
+\fICPlanet\fR.Path: The path to the html file that should be generated
+.br 
+\fICPlanet\fR.Days: The older item presented in the planet shouldn't be older that this number
+.br 
+\fICPlanet\fR.TemplatePath: the patch to the clearsilver template .cs
+.br
+Feed.n.Name: the name of the blog 
+.br
+Feed.n.URL: the URL of the feed
+.br
+.br
+.SH AUTHOR
+\fIB\fRptiste \fID\fRaroussin
