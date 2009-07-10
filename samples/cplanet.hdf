@@ -1,0 +1,35 @@
+CPlanet {
+	Name = Planet BSD Francophone
+	Description = Planet regroupant sites et blogs des BSDistes francophones actifs
+	Path = /home/bapt/planet/www/index.html
+	TemplatePath = /home/bapt/cplanet/cplanet.cs
+	URL = http://planet.etoilebsd.net
+	Days = 7
+	Flux {
+		0 {
+			Name = GCU
+			Home = http://www.gcu.info
+			URL = http://www.gcu.info/feed/atom
+		}
+		1 {
+			Name = Freebsd-fr 
+			Home = http://www.freebsdfr.net
+			URL = http://www.freebsdfr.net/?feed=atom
+		}
+		2 {
+			Name = BSDsx
+			Home = http://blog.bsdsx.fr
+			URL = http://blog.bsdsx.fr/index.atom
+		}
+		3 {
+			Name = iMil
+			Home = http://imil.net
+			URL = http://imil.net/wp/?feed=rss2
+		}
+		4 { 
+			Name = Jadawin
+			Home = http://feeelog.tuxaco.net
+			URL = http://freelog.tuxaco.net/index.cgi/?flav=atom
+		}
+	}
+}
