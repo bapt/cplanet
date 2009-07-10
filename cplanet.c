@@ -1,10 +1,12 @@
- /* This program is free software. It comes without any warranty, to
+/* This program is free software. It comes without any warranty, to
  * the extent permitted by applicable law. You can redistribute it
  * and/or modify it under the terms of the Do What The Fuck You Want
  * To Public License, Version 2, as published by Sam Hocevar. See
  * http://sam.zoy.org/wtfpl/COPYING for more details. */ 
 
-
+/*
+ * vim: set s=4 sw=4 sts=4:
+ */
 #define CPLANET_VERSION "0.1"
 #include <stdio.h>
 #include <unistd.h>
@@ -20,31 +22,31 @@
 
 /* function to create the atom feed */
 /*void 
-create_atom(HDF *hdf)
-{
-    mrss_t *d;
-    mrss_error_t err;
-    HDF *subhdf;
-    d=NULL; // ->this is important! If d!=NULL, mrss_new doesn't alloc memory.
-    mrss_new(&d);
+  create_atom(HDF *hdf)
+  {
+  mrss_t *d;
+  mrss_error_t err;
+  HDF *subhdf;
+  d=NULL; // ->this is important! If d!=NULL, mrss_new doesn't alloc memory.
+  mrss_new(&d);
 
-    err=mrss_set (d,
-	    MRSS_FLAG_VERSION, MRSS_VERSION_2_0,
-	    MRSS_FLAG_TITLE, hdf_get_valuef(hdf,"CPlanet.Name"),
-	    MRSS_FLAG_TTL, 12,
-	    MRSS_FLAG_END);
+  err=mrss_set (d,
+  MRSS_FLAG_VERSION, MRSS_VERSION_2_0,
+  MRSS_FLAG_TITLE, hdf_get_valuef(hdf,"CPlanet.Name"),
+  MRSS_FLAG_TTL, 12,
+  MRSS_FLAG_END);
 
-    if(err!=MRSS_OK) warn("bla%s\n",mrss_strerror(err));
+  if(err!=MRSS_OK) warn("bla%s\n",mrss_strerror(err));
 
-    subhdf = hdf_get_obj(hdf,"CPlanet.Posts.0");
-    while ((subhdf = hdf_obj_next(subhdf)) != NULL) {
-	mrss_t *item = 
-    }
+  subhdf = hdf_get_obj(hdf,"CPlanet.Posts.0");
+  while ((subhdf = hdf_obj_next(subhdf)) != NULL) {
+  mrss_t *item = 
+  }
 
-    err=mrss_write_file( d, "/home/bapt/planet/www/index.atom");
-    if(err!=MRSS_OK) warn("%s\n",mrss_strerror(err));
-}
-*/
+  err=mrss_write_file( d, "/home/bapt/planet/www/index.atom");
+  if(err!=MRSS_OK) warn("%s\n",mrss_strerror(err));
+  }
+  */
 /* convert RFC822 to epoch time */
 
 int
@@ -72,8 +74,8 @@ sort_obj_by_date(const void *a, const void *b) {
 
 /* prepare the string to be written to the html file */
 
-static NEOERR 
-*output (void *ctx, char *s)
+static NEOERR *
+output (void *ctx, char *s)
 {
     STRING *str = (STRING *)ctx;
     NEOERR *err;
@@ -91,7 +93,7 @@ convert_to_Unicode(char *source_encoding, char *str)
     char *output;
     if (!strcmp(source_encoding,"UTF-8"))
 	return str;
-    
+
     iconv_t conv;
     const char * inptr = str;
     conv = iconv_open("UTF-8",source_encoding);
@@ -194,7 +196,7 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 static void
 usage()
 {
-errx(1,"usage: cplanet -c conf.hdf\n");
+    errx(1,"usage: cplanet -c conf.hdf\n");
 }
 
 int 
