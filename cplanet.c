@@ -1,5 +1,13 @@
+ /* This program is free software. It comes without any warranty, to
+ * the extent permitted by applicable law. You can redistribute it
+ * and/or modify it under the terms of the Do What The Fuck You Want
+ * To Public License, Version 2, as published by Sam Hocevar. See
+ * http://sam.zoy.org/wtfpl/COPYING for more details. */ 
+
+
 #define CPLANET_VERSION "0.1"
 #include <stdio.h>
+#include <unistd.h>
 #include <err.h>
 #include <string.h>
 #include <time.h>
@@ -183,8 +191,14 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
     return pos;
 }
 
+static void
+usage()
+{
+errx(1,"usage: cplanet -c conf.hdf\n");
+}
+
 int 
-main (void)
+main (int argc, char *argv[])
 {
     NEOERR *err;
     CSPARSE *parse;
@@ -193,7 +207,26 @@ main (void)
     HDF *flux_hdf;
     int pos=0;
     int days=0;
-    char *cspath, *cs_output;
+    int ch=0;
+    char *cspath, *cs_output, *hdf_file=NULL;
+    if (argc == 1)
+	usage();
+    while ((ch = getopt(argc, argv, "c:h")) != -1)
+	switch (ch) {  
+	    case 'h':
+		usage();
+		break;
+	    case 'c':
+		hdf_file=optarg;
+		/* TODO check file existence here */
+		break;
+	    case '?':
+	    default:
+		usage();
+	}
+    argc -= optind;
+    argv += optind;
+
     string_init(&cs_output_data);
     err = hdf_init(&hdf);
     if (err != STATUS_OK)
@@ -204,7 +237,7 @@ main (void)
     err = hdf_init(&flux_hdf);
 
     /* Read the hdf file */
-    err = hdf_read_file(hdf,"/home/bapt/cplanet.hdf");
+    err = hdf_read_file(hdf,hdf_file);
     if (err != STATUS_OK) {
 	nerr_log_error(err);
 	return -1;
