@@ -1,9 +1,9 @@
 <?xml version="1.0" ?>
 <opml version="1.1">
 <head>
-	<title><?cs var:CPlanet:Name ?></title>
-	<dateCreated>2009-05-15T12:19:14+02:00</dateCreated>
-	<dateModified>2009-05-15T12:19:14+02:00</dateModified>
+	<title><?cs var:CPlanet.Name ?></title>
+	<dateCreated><?cs var:CPlanet.GenerationDate ?></dateCreated>
+	<dateModified><?cs var:CPlanet.GenerationDate ?></dateModified>
 </head>
 <body>
 	<?cs each:feed = CPlanet.Feed ?>

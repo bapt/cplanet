@@ -264,6 +264,13 @@ main (int argc, char *argv[])
 		return -1;
 	}
 	hdf_set_valuef(hdf, "CPlanet.Version=%s", CPLANET_VERSION);
+	char genDate[256];
+	struct tm *ptr;
+	time_t lt;
+	lt = time(NULL);
+	ptr = localtime(&lt);
+	strftime(genDate,256,"%a, %d %b %Y %H:%M:%S %z",ptr);
+	hdf_set_valuef(hdf,"CPlanet.GenerationDate=%s",genDate);
 	char * buf = hdf_get_valuef(hdf, "CPlanet.Days");
 	errno = 0;
 	char *ep;
