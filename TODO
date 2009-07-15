@@ -5,3 +5,4 @@
 - check every kind of errors : file not found, etc.
 - recheck all the free() and *_free() to avoid memory leaks
 - add info, verbose and debug flags
+- add CPlanet.GenerationDate in RFC822 format tout the hdf as it is done for CPLANET_VERSION
