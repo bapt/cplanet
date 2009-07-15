@@ -4,9 +4,8 @@
  * To Public License, Version 2, as published by Sam Hocevar. See
  * http://sam.zoy.org/wtfpl/COPYING for more details. */ 
 
-/*
- * vim: set ts=4 sw=4 sts=4:
- */
+/* vim:set ts=4 sw=4 sts=4: */
+
 #define CPLANET_VERSION "0.1"
 #include <stdio.h>
 #include <unistd.h>
@@ -35,33 +34,6 @@
 #define PURL_ATOM "http://purl.org/atom/ns#"
 #define PURL_RSS "http://purl.org/rss/1.0/modules/content/"
 
-/* function to create the atom feed */
-/*void 
-  create_atom(HDF *hdf)
-  {
-  mrss_t *d;
-  mrss_error_t err;
-  HDF *subhdf;
-  d=NULL; // ->this is important! If d!=NULL, mrss_new doesn't alloc memory.
-  mrss_new(&d);
-
-  err=mrss_set (d,
-  MRSS_FLAG_VERSION, MRSS_VERSION_2_0,
-  MRSS_FLAG_TITLE, hdf_get_valuef(hdf,"CPlanet.Name"),
-  MRSS_FLAG_TTL, 12,
-  MRSS_FLAG_END);
-
-  if(err!=MRSS_OK) warn("bla%s\n",mrss_strerror(err));
-
-  subhdf = hdf_get_obj(hdf,"CPlanet.Posts.0");
-  while ((subhdf = hdf_obj_next(subhdf)) != NULL) {
-  mrss_t *item = 
-  }
-
-  err=mrss_write_file( d, "/home/bapt/planet/www/index.atom");
-  if(err!=MRSS_OK) warn("%s\n",mrss_strerror(err));
-  }
- */
 /* convert RFC822 to epoch time */
 
 time_t
@@ -95,7 +67,7 @@ sort_obj_by_date(const void *a, const void *b) {
 /* prepare the string to be written to the html file */
 
 static NEOERR *
-output (void *ctx, char *s)
+cplanet_output (void *ctx, char *s)
 {
 	STRING *str = (STRING *)ctx;
 	NEOERR *neoerr;
@@ -204,6 +176,44 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 	return pos;
 }
 
+
+void
+generate_file(HDF *output_hdf, HDF *hdf)
+{
+	NEOERR *neoerr;
+	CSPARSE *parse;
+	STRING cs_output_data;
+	string_init(&cs_output_data);
+	neoerr = cs_init(&parse,hdf);
+	if (neoerr != STATUS_OK) {
+		nerr_log_error(neoerr);
+		return;
+	}
+	char *cs_output=hdf_get_valuef(output_hdf,"Path");
+	char *cs_path=hdf_get_valuef(output_hdf,"TemplatePath");
+	neoerr = cs_parse_file(parse, cs_path);
+	if (neoerr != STATUS_OK) {
+		neoerr = nerr_pass(neoerr);
+		nerr_log_error(neoerr);
+		return;
+	}
+	neoerr = cs_render(parse, &cs_output_data, cplanet_output);
+	if (neoerr != STATUS_OK) {
+		neoerr = nerr_pass(neoerr);
+		nerr_log_error(neoerr);
+		return;
+	}
+	FILE *output = fopen(cs_output, "w+");
+	if (output == NULL)
+		err(1,"%s",cs_output);
+	fprintf(output,"%s",cs_output_data.buf);
+	fflush(output);
+	fclose(output);
+	cs_destroy(&parse);
+	string_clear(&cs_output_data);
+}
+
+
 static void
 usage()
 {
@@ -214,14 +224,13 @@ int
 main (int argc, char *argv[])
 {
 	NEOERR *neoerr;
-	CSPARSE *parse;
-	STRING cs_output_data;
 	HDF *hdf;
 	HDF *feed_hdf;
+	HDF *output_hdf;
 	int pos = 0;
 	int days = 0;
 	int ch = 0;
-	char *cspath, *cs_output, *hdf_file = NULL;
+	char *hdf_file = NULL;
 	if (argc == 1)
 		usage();
 	while ((ch = getopt(argc, argv, "c:h")) != -1)
@@ -241,7 +250,6 @@ main (int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	string_init(&cs_output_data);
 	neoerr = hdf_init(&hdf);
 	if (neoerr != STATUS_OK) {
 		nerr_log_error(neoerr);
@@ -256,8 +264,6 @@ main (int argc, char *argv[])
 		return -1;
 	}
 	hdf_set_valuef(hdf, "CPlanet.Version=%s", CPLANET_VERSION);
-	cspath = hdf_get_valuef(hdf, "CPlanet.TemplatePath");
-	cs_output = hdf_get_valuef(hdf, "CPlanet.Path");
 	char * buf = hdf_get_valuef(hdf, "CPlanet.Days");
 	errno = 0;
 	char *ep;
@@ -275,32 +281,12 @@ main (int argc, char *argv[])
 		pos = get_posts(feed_hdf, hdf, pos, days);
 	}
 	hdf_sort_obj(hdf_get_obj(hdf, "CPlanet.Posts"), sort_obj_by_date);
-	/*	hdf_dump(hdf,NULL); */
-	neoerr = cs_init (&parse, hdf);
-	if (neoerr != STATUS_OK) {
-		nerr_log_error(neoerr);
-		return -1;
+	/* get every output set in the hdf file and generate them */
+	output_hdf = hdf_get_obj(hdf,"CPlanet.Output.0");
+	generate_file(output_hdf,hdf);
+	while (( output_hdf = hdf_obj_next(output_hdf)) != NULL) {
+		generate_file(output_hdf,hdf);
 	}
-	neoerr = cs_parse_file(parse, cspath);
-	if (neoerr != STATUS_OK) {
-		neoerr = nerr_pass(neoerr);
-		nerr_log_error(neoerr);
-		return -1;
-	}
-	neoerr = cs_render(parse, &cs_output_data, output);
-	if (neoerr != STATUS_OK) {
-		neoerr = nerr_pass(neoerr);
-		nerr_log_error(neoerr);
-		return -1;
-	}
-	FILE *output = fopen(cs_output, "w+");
-	if (output == NULL)
-		err(1,"%s",cs_output);
-	fprintf(output,"%s",cs_output_data.buf);
-	fflush(output);
-	fclose(output);
-	cs_destroy(&parse);
-	/*create_atom(hdf);*/
 	hdf_destroy(&hdf);
 	hdf_destroy(&feed_hdf);
 	return EXIT_SUCCESS;
