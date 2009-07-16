@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
     <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-	<meta name="generator" content="CPlanet" />
+	<meta name="generator" content="CPlanet <?cs var:CPlanet.Version ?>" />
 	<link rel="stylesheet" type="text/css" href="style.css" />
 	<title><?cs var:CPlanet.Name ?></title>
     </head>

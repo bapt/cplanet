@@ -10,6 +10,14 @@ CPlanet {
 			Path = ./samples/cplanet.opml
 			TemplatePath = ./samples/cplanet-opml.cs
 		}
+		2 { 
+			Path = ./samples/cplanet.rss
+			TemplatePath = ./samples/cplanet-rss.cs
+		}
+		3 {
+			Path = ./samples/cplanet.atom
+			TemplatePath = ./samples/cplanet-atom.cs
+		}
 	}
 	URL =  http://planet.etoilebsd.net
 	Days = 7
