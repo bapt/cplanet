@@ -11,7 +11,6 @@
 	<?cs each:post = CPlanet.Posts ?>
 	<entry>
 		<title type="text"><?cs var:post.FeedName ?> >> <?cs var:post.Title ?></title>
-		<summary type="text">None Currently</summary>
 		<?cs if:post.Author ?><author><name> <?cs var:post.Author  ?></name></author> <?cs /if ?>
 		<content type="html"><![CDATA[<?cs var:post.Description ?>]]></content>
 		<?cs each:tags = post.Tags ?><category term="<?cs var:tags.Tag ?>" /><?cs /each ?>
