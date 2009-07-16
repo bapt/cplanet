@@ -19,7 +19,8 @@
 #include <util/neo_misc.h>
 #include <util/neo_hdf.h>
 #include <sys/stat.h>
-
+#include <syslog.h>
+#include <stdarg.h>
 
 #define CP_NAME "CPlanet.Posts.%i.Name=%s"
 #define CP_FEEDNAME "CPlanet.Posts.%i.FeedName=%s"
@@ -35,6 +36,33 @@
 #define PURL_ATOM "http://purl.org/atom/ns#"
 #define PURL_RSS "http://purl.org/rss/1.0/modules/content/"
 
+int syslog_flag = 0; /* 0 == log to stderr */
+STRING neoerr_str; /* neoerr to string */
+
+void
+cplanet_err(int eval, const char* message, ...)
+{
+	va_list args;
+	va_start(args, message);
+	if (syslog_flag) {
+		vsyslog(LOG_ERR, message, args);
+		exit(eval);
+	} else {
+		verr(eval, message, args);
+	}
+}
+
+void
+cplanet_warn(const char* message, ...)
+{
+	va_list args;
+	va_start(args, message);
+	if (syslog_flag)
+		vsyslog(LOG_WARNING, message, args);
+	else
+		vwarn(message, args);
+}
+
 /* convert RFC822 to epoch time */
 
 time_t
@@ -44,11 +72,15 @@ str_to_time_t(char *s)
 	time_t t;
 	errno = 0;
 	char *pos = strptime(s, "%a, %d %b %Y %T", &date);
-	if (pos == NULL)
-		err(1, "Convert '%s' to struct tm failed", s);
+	if (pos == NULL) {
+		errno = EINVAL;
+		cplanet_err(1, "Convert '%s' to struct tm failed", s);
+	}
 	t = mktime(&date);
-	if (t == (time_t)-1)
-		err(1, "Convert struct tm (from '%s') to time_t failed", s);
+	if (t == (time_t)-1) {
+		errno = EINVAL;
+		cplanet_err(1, "Convert struct tm (from '%s') to time_t failed", s);
+	}
 	return t;
 }
 
@@ -90,8 +122,8 @@ str_to_UTF8(char *source_encoding, char *str)
 	iconv_t conv;
 	const char * inptr = str;
 	conv = iconv_open("UTF-8", source_encoding);
-	if (conv == (iconv_t) -1) {
-		warn("conversion from '%s' to UTF-8 not available", source_encoding);
+	if (conv == (iconv_t)-1) {
+		cplanet_warn("Conversion from '%s' to UTF-8 not available", source_encoding);
 		return str;
 	}
 	if (str == NULL)
@@ -102,8 +134,8 @@ str_to_UTF8(char *source_encoding, char *str)
 	memset(output, 0, outsize);
 	char *outputptr = output;
 	ret = iconv(conv, (const char**) &inptr, &insize, &outputptr, &outsize);
-	if (ret ==(size_t) -1) {
-		warn("Conversion Failed");
+	if (ret == (size_t)-1) {
+		cplanet_warn("Conversion Failed");
 		free(output);
 		iconv_close(conv);
 		return str;
@@ -123,10 +155,10 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 	CURLcode code;
 	char *encoding;
 	char *name = hdf_get_valuef(hdf_cfg, "Name");
-	char *date_format = hdf_get_valuef(hdf_dest,"CPlanet.DateFormat");
+	char *date_format = hdf_get_valuef(hdf_dest, "CPlanet.DateFormat");
 	ret = mrss_parse_url_with_options_and_error(hdf_get_valuef(hdf_cfg, "URL"), &feed, NULL, &code);
 	if (ret) {
-		warn("MRSS return error: %s, %s\n",
+		cplanet_warn("MRSS return error: %s, %s\n",
 				ret ==
 				MRSS_ERR_DOWNLOAD ? mrss_curl_strerror(code) :
 				mrss_strerror(ret), name);
@@ -152,10 +184,10 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 			char formated_date[256];
 			struct tm *ptr;
 			time_t time;
-			time=str_to_time_t(item->pubDate);
+			time = str_to_time_t(item->pubDate);
 			ptr = localtime(&time);
-			strftime(formated_date,256,date_format,ptr);
-			hdf_set_valuef(hdf_dest,CP_FORMATED_DATE,pos,formated_date);
+			strftime(formated_date, 256, date_format, ptr);
+			hdf_set_valuef(hdf_dest, CP_FORMATED_DATE, pos, formated_date);
 		}
 		/* Description is only for description tag, we want content if exists */
 		if (feed->version == MRSS_VERSION_ATOM_0_3 || feed->version == MRSS_VERSION_ATOM_1_0) {
@@ -174,9 +206,9 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 		}
 		mrss_free(content);
 		/* Get the categories/tags */
-		int nb_tags=0;
+		int nb_tags = 0;
 		for (tags = item->category; tags; tags = tags->next) {
-			hdf_set_valuef(hdf_dest, "CPlanet.Posts.%i.Tags.%i.Tag=%s", pos, nb_tags, str_to_UTF8(encoding, tags->category));
+			hdf_set_valuef(hdf_dest, CP_TAG, pos, nb_tags, str_to_UTF8(encoding, tags->category));
 			nb_tags++;
 		}
 		mrss_free(tags);
@@ -195,29 +227,32 @@ generate_file(HDF *output_hdf, HDF *hdf)
 	CSPARSE *parse;
 	STRING cs_output_data;
 	string_init(&cs_output_data);
-	neoerr = cs_init(&parse,hdf);
+	neoerr = cs_init(&parse, hdf);
 	if (neoerr != STATUS_OK) {
-		nerr_log_error(neoerr);
+		nerr_error_string(neoerr, &neoerr_str);
+		cplanet_warn(neoerr_str.buf);
 		return;
 	}
-	char *cs_output=hdf_get_valuef(output_hdf,"Path");
-	char *cs_path=hdf_get_valuef(output_hdf,"TemplatePath");
+	char *cs_output = hdf_get_valuef(output_hdf, "Path");
+	char *cs_path = hdf_get_valuef(output_hdf, "TemplatePath");
 	neoerr = cs_parse_file(parse, cs_path);
 	if (neoerr != STATUS_OK) {
 		neoerr = nerr_pass(neoerr);
-		nerr_log_error(neoerr);
+		nerr_error_string(neoerr, &neoerr_str);
+		cplanet_warn(neoerr_str.buf);
 		return;
 	}
 	neoerr = cs_render(parse, &cs_output_data, cplanet_output);
 	if (neoerr != STATUS_OK) {
 		neoerr = nerr_pass(neoerr);
-		nerr_log_error(neoerr);
+		nerr_error_string(neoerr, &neoerr_str);
+		cplanet_warn(neoerr_str.buf);
 		return;
 	}
 	FILE *output = fopen(cs_output, "w+");
 	if (output == NULL)
-		err(1,"%s",cs_output);
-	fprintf(output,"%s",cs_output_data.buf);
+		cplanet_err(1, "%s", cs_output);
+	fprintf(output, "%s", cs_output_data.buf);
 	fflush(output);
 	fclose(output);
 	cs_destroy(&parse);
@@ -228,7 +263,7 @@ generate_file(HDF *output_hdf, HDF *hdf)
 static void
 usage()
 {
-	errx(1, "usage: cplanet -c conf.hdf\n");
+	errx(1, "usage: cplanet -c conf.hdf [-l]\n");
 }
 
 int 
@@ -244,7 +279,7 @@ main (int argc, char *argv[])
 	char *hdf_file = NULL;
 	if (argc == 1)
 		usage();
-	while ((ch = getopt(argc, argv, "c:h")) != -1)
+	while ((ch = getopt(argc, argv, "c:lh")) != -1)
 		switch (ch) {  
 			case 'h':
 				usage();
@@ -252,7 +287,10 @@ main (int argc, char *argv[])
 			case 'c':
 				hdf_file = optarg;
 				if(access(hdf_file, F_OK | R_OK) == -1 )
-					err(1,"%s",hdf_file);
+					err(1, "%s", hdf_file);
+				break;
+			case 'l':
+				syslog_flag++;
 				break;
 			case '?':
 			default:
@@ -261,18 +299,22 @@ main (int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	if (syslog_flag)
+		openlog("cplanet", LOG_CONS, LOG_USER);
+
+	string_init(&neoerr_str);
 	neoerr = hdf_init(&hdf);
 	if (neoerr != STATUS_OK) {
-		nerr_log_error(neoerr);
-		return -1;
+		nerr_error_string(neoerr, &neoerr_str);
+		cplanet_err(-1, neoerr_str.buf);
 	}
 	neoerr = hdf_init(&feed_hdf);
 
 	/* Read the hdf file */
 	neoerr = hdf_read_file(hdf, hdf_file);
 	if (neoerr != STATUS_OK) {
-		nerr_log_error(neoerr);
-		return -1;
+		nerr_error_string(neoerr, &neoerr_str);
+		cplanet_err(-1, neoerr_str.buf);
 	}
 	hdf_set_valuef(hdf, "CPlanet.Version=%s", CPLANET_VERSION);
 	char genDate[256];
@@ -280,17 +322,17 @@ main (int argc, char *argv[])
 	time_t lt;
 	lt = time(NULL);
 	ptr = localtime(&lt);
-	strftime(genDate,256,"%a, %d %b %Y %H:%M:%S %z",ptr);
-	hdf_set_valuef(hdf,"CPlanet.GenerationDate=%s",genDate);
-	char * buf = hdf_get_valuef(hdf, "CPlanet.Days");
+	strftime(genDate, 256, "%a, %d %b %Y %H:%M:%S %z", ptr);
+	hdf_set_valuef(hdf, "CPlanet.GenerationDate=%s", genDate);
+	char *buf = hdf_get_valuef(hdf, "CPlanet.Days");
 	errno = 0;
 	char *ep;
-	long ldays = strtol(buf,&ep,10);
+	long ldays = strtol(buf, &ep, 10);
 	if (buf[0] == '\0' || *ep != '\0')
-		err(1,"[%s]: not a number", buf);
+		err(1, "[%s]: not a number", buf);
 	if((errno == ERANGE && (ldays == LONG_MAX || ldays == LONG_MIN )) ||
 					(ldays > INT_MAX || ldays <INT_MIN))
-		err(1,"[%s]: out of range",buf);
+		cplanet_err(1, "[%s]: out of range", buf);
 	days = (int)ldays;
 	days = days * 24 * 60 * 60;
 	feed_hdf = hdf_get_obj(hdf, "CPlanet.Feed.0");
@@ -300,12 +342,16 @@ main (int argc, char *argv[])
 	}
 	hdf_sort_obj(hdf_get_obj(hdf, "CPlanet.Posts"), sort_obj_by_date);
 	/* get every output set in the hdf file and generate them */
-	output_hdf = hdf_get_obj(hdf,"CPlanet.Output.0");
-	generate_file(output_hdf,hdf);
-	while (( output_hdf = hdf_obj_next(output_hdf)) != NULL) {
-		generate_file(output_hdf,hdf);
+	output_hdf = hdf_get_obj(hdf, "CPlanet.Output.0");
+	generate_file(output_hdf, hdf);
+	while ((output_hdf = hdf_obj_next(output_hdf)) != NULL) {
+		generate_file(output_hdf, hdf);
 	}
 	hdf_destroy(&hdf);
 	hdf_destroy(&feed_hdf);
+
+	if (syslog_flag)
+		closelog();
+
 	return EXIT_SUCCESS;
 }
