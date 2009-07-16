@@ -27,6 +27,7 @@
 #define CP_TITLE "CPlanet.Posts.%i.Title=%s"
 #define CP_LINK "CPlanet.Posts.%i.Link=%s"
 #define CP_DATE "CPlanet.Posts.%i.Date=%s"
+#define CP_FORMATED_DATE  "CPlanet.Posts.%i.FormatedDate=%s"
 #define CP_DESCRIPTION "CPlanet.Posts.%i.Description=%s"
 #define CP_TAG "CPlanet.Posts.%i.Tags.%i.Tag=%s"
 
@@ -122,6 +123,7 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 	CURLcode code;
 	char *encoding;
 	char *name = hdf_get_valuef(hdf_cfg, "Name");
+	char *date_format = hdf_get_valuef(hdf_dest,"CPlanet.DateFormat");
 	ret = mrss_parse_url_with_options_and_error(hdf_get_valuef(hdf_cfg, "URL"), &feed, NULL, &code);
 	if (ret) {
 		warn("MRSS return error: %s, %s\n",
@@ -146,6 +148,15 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 		hdf_set_valuef(hdf_dest, CP_TITLE, pos, str_to_UTF8(encoding, item->title));
 		hdf_set_valuef(hdf_dest, CP_LINK, pos, item->link);
 		hdf_set_valuef(hdf_dest, CP_DATE, pos, item->pubDate);
+		if (date_format != NULL) {
+			char formated_date[256];
+			struct tm *ptr;
+			time_t time;
+			time=str_to_time_t(item->pubDate);
+			ptr = localtime(&time);
+			strftime(formated_date,256,date_format,ptr);
+			hdf_set_valuef(hdf_dest,CP_FORMATED_DATE,pos,formated_date);
+		}
 		/* Description is only for description tag, we want content if exists */
 		if (feed->version == MRSS_VERSION_ATOM_0_3 || feed->version == MRSS_VERSION_ATOM_1_0) {
 			if ((mrss_search_tag(item, "content", W3_ATOM, &content) == MRSS_OK && content) || 
