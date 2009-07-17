@@ -1,28 +1,46 @@
-.TH \fICPlanet\fR 0.1 "Jul 10, 2009" " " "\fICPlanet\fR"
+.TH CPlanet 1 "Jul 17, 2009"
 .SH NAME
-\fICPlanet\fR - a RSS Feed Aggregator to generate a planet
+\fBCPlanet\fP \- a RSS Feed Aggregator to generate a planet
 .SH SYNOPSIS
-cplanet -c file.hdf
+\fBcplanet\fP -c config.hdf [-l]
 .SH DESCRIPTION
-\fICPlanet\fR is a RSS/ATOM feed aggregator written in C that generate static html
+\fBCPlanet\fP is a RSS/ATOM feed aggregator written in C that generate static html
 files.
+.SS OPTIONS
+.TP
+\fB-c config.hdf\fP
+specify the path of th hdf configuration file
+.TP
+\fB-l\fP
+set the log to be written in syslog
+.SS HDF format
+cplanet uses the clearsilver's hdf format as a configuration file, some keys are 
+mandatory. Users can add as much keys as they want as they can be used in the
+template file.
+.TP
+\fBCPlanet.Output.N.Path\fP 
+N represents a number starting from 0, this is the patch for the file N to
+generate
+.TP
+\fBCPlanet.Output.N.TemplatePath\fP
+Path of the template to use to generate the file number N
+.TP
+\fBCPlanet.Days\fP
+oldest post from the feeds to keep in days.
+.TP
+\fBCPlanet.Feed.N.Name\fP
+name of the N feed to fetch
+.TP
+\fBCPlanet.Feed.N.URL\fP
+URL of the N Feed (ATOM or RSS) to fetch.
 .br
-\fICPlanet\fR uses clearsilver as a template engine and hdf (from clearsilver) as a
-configureation file.
 .br
-You can do what ever you wants in the HDF file but some options are mandatory:
-.br
-.br 
-\fICPlanet\fR.Path: The path to the html file that should be generated
-.br 
-\fICPlanet\fR.Days: The older item presented in the planet shouldn't be older that this number
-.br 
-\fICPlanet\fR.TemplatePath: the patch to the clearsilver template .cs
-.br
-Feed.n.Name: the name of the blog 
-.br
-Feed.n.URL: the URL of the feed
-.br
-.br
-.SH AUTHOR
-\fIB\fRptiste \fID\fRaroussin
+for more informations concerning the HDF file format please refer to the
+clearsilver documentation: http://www.clearsilver.net/docs/man_hdf.hdf
+.SS Template File
+\fBCPlanet\fP uses the clearsilver template system, please refer to the
+clearsilver documentation: http://www.clearsilver.net/docs/man_templates.hdf
+.SH AUTHORS
+Baptiste Daroussin
+.SH CONTRIBUTORS
+Freddy DISSAUX
