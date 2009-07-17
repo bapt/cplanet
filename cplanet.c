@@ -330,13 +330,11 @@ main (int argc, char *argv[])
 	long ldays = strtol(buf, &ep, 10);
 	if (buf[0] == '\0' || *ep != '\0')
 		err(1, "[%s]: not a number", buf);
+	ldays = ldays * 24 * 60 * 60;
 	if((errno == ERANGE && (ldays == LONG_MAX || ldays == LONG_MIN )) ||
 					(ldays > INT_MAX || ldays <INT_MIN))
 		cplanet_err(1, "[%s]: out of range", buf);
 	days = (int)ldays;
-	days = days * 24 * 60 * 60;
-	if (days < INT_MIN || days > INT_MAX)
-		cplanet_err(1, "[%s]: out of range", buf);
 	feed_hdf = hdf_get_obj(hdf, "CPlanet.Feed.0");
 	pos = get_posts(feed_hdf, hdf, pos, days);
 	while ((feed_hdf = hdf_obj_next(feed_hdf)) != NULL) {
