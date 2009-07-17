@@ -47,8 +47,10 @@ cplanet_err(int eval, const char* message, ...)
 	if (syslog_flag) {
 		vsyslog(LOG_ERR, message, args);
 		exit(eval);
+		/* NOTREACHED */
 	} else {
 		verr(eval, message, args);
+		/* NOTREACHED */
 	}
 }
 
@@ -61,6 +63,7 @@ cplanet_warn(const char* message, ...)
 		vsyslog(LOG_WARNING, message, args);
 	else
 		vwarn(message, args);
+	va_end(args);
 }
 
 /* convert RFC822 to epoch time */
@@ -92,9 +95,7 @@ sort_obj_by_date(const void *a, const void *b) {
 	HDF **hb = (HDF **)b;
 	time_t atime = str_to_time_t(hdf_get_valuef(*ha, "Date"));
 	time_t btime = str_to_time_t(hdf_get_valuef(*hb, "Date"));
-	if (atime < btime) return 1;
-	if (atime == btime) return 0;
-	return -1;
+	return (btime - atime);
 }
 
 /* prepare the string to be written to the html file */
@@ -102,7 +103,7 @@ sort_obj_by_date(const void *a, const void *b) {
 static NEOERR *
 cplanet_output (void *ctx, char *s)
 {
-	STRING *str = (STRING *)ctx;
+	STRING *str = ctx;
 	NEOERR *neoerr;
 
 	neoerr = nerr_pass(string_append(str, s));
@@ -131,6 +132,8 @@ str_to_UTF8(char *source_encoding, char *str)
 	insize = strlen(str);
 	outsize = 4 * insize + 2;
 	output = malloc(outsize);
+	if ( output == NULL )
+		cplanet_err(ENOMEM, "malloc");
 	memset(output, 0, outsize);
 	char *outputptr = output;
 	ret = iconv(conv, (const char**) &inptr, &insize, &outputptr, &outsize);
@@ -228,27 +231,16 @@ generate_file(HDF *output_hdf, HDF *hdf)
 	STRING cs_output_data;
 	string_init(&cs_output_data);
 	neoerr = cs_init(&parse, hdf);
-	if (neoerr != STATUS_OK) {
-		nerr_error_string(neoerr, &neoerr_str);
-		cplanet_warn(neoerr_str.buf);
-		return;
-	}
+	if (neoerr != STATUS_OK) 
+		goto warn1;
 	char *cs_output = hdf_get_valuef(output_hdf, "Path");
 	char *cs_path = hdf_get_valuef(output_hdf, "TemplatePath");
 	neoerr = cs_parse_file(parse, cs_path);
-	if (neoerr != STATUS_OK) {
-		neoerr = nerr_pass(neoerr);
-		nerr_error_string(neoerr, &neoerr_str);
-		cplanet_warn(neoerr_str.buf);
-		return;
-	}
+	if (neoerr != STATUS_OK) 
+		goto warn0;
 	neoerr = cs_render(parse, &cs_output_data, cplanet_output);
-	if (neoerr != STATUS_OK) {
-		neoerr = nerr_pass(neoerr);
-		nerr_error_string(neoerr, &neoerr_str);
-		cplanet_warn(neoerr_str.buf);
-		return;
-	}
+	if (neoerr != STATUS_OK) 
+		goto warn0;
 	FILE *output = fopen(cs_output, "w+");
 	if (output == NULL)
 		cplanet_err(1, "%s", cs_output);
@@ -257,11 +249,19 @@ generate_file(HDF *output_hdf, HDF *hdf)
 	fclose(output);
 	cs_destroy(&parse);
 	string_clear(&cs_output_data);
+	return;
+
+warn0:
+	cs_destroy(&parse);
+warn1:
+	string_clear(&cs_output_data);
+	nerr_error_string(neoerr,&neoerr_str);
+	cplanet_warn(neoerr_str.buf);
 }
 
 
 static void
-usage()
+usage(void)
 {
 	errx(1, "usage: cplanet -c conf.hdf [-l]\n");
 }
@@ -335,6 +335,8 @@ main (int argc, char *argv[])
 		cplanet_err(1, "[%s]: out of range", buf);
 	days = (int)ldays;
 	days = days * 24 * 60 * 60;
+	if (days < INT_MIN || days > INT_MAX)
+		cplanet_err(1, "[%s]: out of range", buf);
 	feed_hdf = hdf_get_obj(hdf, "CPlanet.Feed.0");
 	pos = get_posts(feed_hdf, hdf, pos, days);
 	while ((feed_hdf = hdf_obj_next(feed_hdf)) != NULL) {
