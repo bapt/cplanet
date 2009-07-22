@@ -335,20 +335,17 @@ main (int argc, char *argv[])
 					(ldays > INT_MAX || ldays <INT_MIN))
 		cplanet_err(1, "[%s]: out of range", buf);
 	days = (int)ldays;
-	feed_hdf = hdf_get_obj(hdf, "CPlanet.Feed.0");
-	pos = get_posts(feed_hdf, hdf, pos, days);
-	while ((feed_hdf = hdf_obj_next(feed_hdf)) != NULL) {
+	for (feed_hdf = hdf_get_obj(hdf, "CPlanet.Feed.0");
+			feed_hdf != NULL; feed_hdf = hdf_obj_next(feed_hdf)) 
 		pos = get_posts(feed_hdf, hdf, pos, days);
-	}
 	hdf_sort_obj(hdf_get_obj(hdf, "CPlanet.Posts"), sort_obj_by_date);
 	/* get every output set in the hdf file and generate them */
-	output_hdf = hdf_get_obj(hdf, "CPlanet.Output.0");
-	generate_file(output_hdf, hdf);
-	while ((output_hdf = hdf_obj_next(output_hdf)) != NULL) {
+	for (output_hdf = hdf_get_obj(hdf, "CPlanet.Output.0");
+		output_hdf != NULL; output_hdf = hdf_obj_next(output_hdf))
 		generate_file(output_hdf, hdf);
-	}
 	hdf_destroy(&hdf);
 	hdf_destroy(&feed_hdf);
+	hdf_destroy(&output_hdf);
 
 	if (syslog_flag)
 		closelog();
