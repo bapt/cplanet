@@ -6,31 +6,7 @@
 
 /* vim:set ts=4 sw=4 sts=4: */
 
-#define CPLANET_VERSION "0.1"
-#include <stdio.h>
-#include <unistd.h>
-#include <err.h>
-#include <string.h>
-#include <time.h>
-#include <mrss.h>
-#include <cs/cs.h>
-#include <iconv.h>
-#include <limits.h>
-#include <util/neo_misc.h>
-#include <util/neo_hdf.h>
-#include <sys/stat.h>
-#include <syslog.h>
-#include <stdarg.h>
-
-#define CP_NAME "CPlanet.Posts.%i.Name=%s"
-#define CP_FEEDNAME "CPlanet.Posts.%i.FeedName=%s"
-#define CP_AUTHOR "CPlanet.Posts.%i.Author=%s"
-#define CP_TITLE "CPlanet.Posts.%i.Title=%s"
-#define CP_LINK "CPlanet.Posts.%i.Link=%s"
-#define CP_DATE "CPlanet.Posts.%i.Date=%s"
-#define CP_FORMATED_DATE  "CPlanet.Posts.%i.FormatedDate=%s"
-#define CP_DESCRIPTION "CPlanet.Posts.%i.Description=%s"
-#define CP_TAG "CPlanet.Posts.%i.Tags.%i.Tag=%s"
+#include "cplanet.h"
 
 #define W3_ATOM "http://www.w3.org/2005/Atom"
 #define PURL_ATOM "http://purl.org/atom/ns#"
@@ -176,13 +152,13 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 			continue;
 		mrss_category_t *tags;
 		mrss_tag_t *content; 
-		hdf_set_valuef(hdf_dest, CP_NAME, pos, name);
-		hdf_set_valuef(hdf_dest, CP_FEEDNAME, pos, str_to_UTF8(encoding, feed->title));
+		cp_set_name(hdf_dest, pos, name);
+		cp_set_feedname(hdf_dest, pos, str_to_UTF8(encoding, feed->title));
 		if (item->author != NULL)
-			hdf_set_valuef(hdf_dest, CP_AUTHOR, pos, str_to_UTF8(encoding, item->author));
-		hdf_set_valuef(hdf_dest, CP_TITLE, pos, str_to_UTF8(encoding, item->title));
-		hdf_set_valuef(hdf_dest, CP_LINK, pos, item->link);
-		hdf_set_valuef(hdf_dest, CP_DATE, pos, item->pubDate);
+			cp_set_author(hdf_dest, pos, str_to_UTF8(encoding, item->author));
+		cp_set_title(hdf_dest, pos, str_to_UTF8(encoding, item->title));
+		cp_set_link(hdf_dest, pos, item->link);
+		cp_set_date(hdf_dest, pos, item->pubDate);
 		if (date_format != NULL) {
 			char formated_date[256];
 			struct tm *ptr;
@@ -190,29 +166,28 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 			time = str_to_time_t(item->pubDate);
 			ptr = localtime(&time);
 			strftime(formated_date, 256, date_format, ptr);
-			hdf_set_valuef(hdf_dest, CP_FORMATED_DATE, pos, formated_date);
+			cp_set_formated_date(hdf_dest, pos, formated_date);
 		}
 		/* Description is only for description tag, we want content if exists */
 		if (feed->version == MRSS_VERSION_ATOM_0_3 || feed->version == MRSS_VERSION_ATOM_1_0) {
 			if ((mrss_search_tag(item, "content", W3_ATOM, &content) == MRSS_OK && content) || 
 					(mrss_search_tag(item, "content", PURL_ATOM, &content) == MRSS_OK && content)) {
-				hdf_set_valuef(hdf_dest, CP_DESCRIPTION, pos, str_to_UTF8(encoding, content->value));
+				cp_set_description(hdf_dest, pos, str_to_UTF8(encoding, content->value));
 			} else {
-				hdf_set_valuef(hdf_dest, CP_DESCRIPTION, pos, str_to_UTF8(encoding, item->description));
+				cp_set_description(hdf_dest, pos, str_to_UTF8(encoding, item->description));
 			}
 		} else {
 			if (mrss_search_tag(item, "encoded", PURL_RSS, &content) == MRSS_OK && content) {
-				hdf_set_valuef(hdf_dest, CP_DESCRIPTION, pos, str_to_UTF8(encoding, content->value));
+				cp_set_description(hdf_dest, pos, str_to_UTF8(encoding, content->value));
 			} else {
-				hdf_set_valuef(hdf_dest, CP_DESCRIPTION, pos, str_to_UTF8(encoding, item->description));
+				cp_set_description(hdf_dest, pos, str_to_UTF8(encoding, item->description));
 			}
 		}
 		mrss_free(content);
 		/* Get the categories/tags */
 		int nb_tags = 0;
-		for (tags = item->category; tags; tags = tags->next) {
-			hdf_set_valuef(hdf_dest, CP_TAG, pos, nb_tags, str_to_UTF8(encoding, tags->category));
-			nb_tags++;
+		for (tags = item->category; tags; nb_tags++, tags = tags->next) {
+			cp_set_tag(hdf_dest, pos, nb_tags, str_to_UTF8(encoding, tags->category));
 		}
 		mrss_free(tags);
 		pos++;
@@ -335,14 +310,18 @@ main (int argc, char *argv[])
 					(ldays > INT_MAX || ldays <INT_MIN))
 		cplanet_err(1, "[%s]: out of range", buf);
 	days = (int)ldays;
-	for (feed_hdf = hdf_get_obj(hdf, "CPlanet.Feed.0");
-			feed_hdf != NULL; feed_hdf = hdf_obj_next(feed_hdf)) 
+	feed_hdf = hdf_get_obj(hdf, "CPlanet.Feed.0");
+	pos = get_posts(feed_hdf, hdf, pos, days);
+	while ((feed_hdf = hdf_obj_next(feed_hdf)) != NULL) {
 		pos = get_posts(feed_hdf, hdf, pos, days);
+	}
 	hdf_sort_obj(hdf_get_obj(hdf, "CPlanet.Posts"), sort_obj_by_date);
 	/* get every output set in the hdf file and generate them */
-	for (output_hdf = hdf_get_obj(hdf, "CPlanet.Output.0");
-		output_hdf != NULL; output_hdf = hdf_obj_next(output_hdf))
+	output_hdf = hdf_get_obj(hdf, "CPlanet.Output.0");
+	generate_file(output_hdf, hdf);
+	while ((output_hdf = hdf_obj_next(output_hdf)) != NULL) {
 		generate_file(output_hdf, hdf);
+	}
 	hdf_destroy(&hdf);
 	hdf_destroy(&feed_hdf);
 	hdf_destroy(&output_hdf);
