@@ -46,8 +46,8 @@
 #define cp_set_version(hdf_dest) hdf_set_valuef(hdf_dest, "CPlanet.Version=%s", CPLANET_VERSION)
 
 /* CPlanet Getters */
-#define HDF_FOREACH(var, hdf, str) 		\
-	for ((var) = hdf_get_obj((hdf),str); 	\
+#define HDF_FOREACH(var, hdf, node) 		\
+	for ((var) = hdf_get_obj((hdf),node); 	\
 	     (var); 			\
 	     (var) = hdf_obj_next((var)))
 
