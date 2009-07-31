@@ -31,6 +31,8 @@
 #define CP_FORMATED_DATE  "CPlanet.Posts.%i.FormatedDate=%s"
 #define CP_DESCRIPTION "CPlanet.Posts.%i.Description=%s"
 #define CP_TAG "CPlanet.Posts.%i.Tags.%i.Tag=%s"
+#define CP_VERSION "CPlanet.Version=%s"
+#define CP_GEN_DATE "CPlanet.GenerationDate=%s"
 
 /* CPlanet Setters */
 
@@ -43,12 +45,12 @@
 #define cp_set_formated_date(hdf_dest, ...) hdf_set_valuef(hdf_dest, CP_FORMATED_DATE, ##__VA_ARGS__)
 #define cp_set_description(hdf_dest, ...) hdf_set_valuef(hdf_dest, CP_DESCRIPTION, ##__VA_ARGS__)
 #define cp_set_tag(hdf_dest, ...) hdf_set_valuef(hdf_dest, CP_TAG, ##__VA_ARGS__)
-#define cp_set_version(hdf_dest) hdf_set_valuef(hdf_dest, "CPlanet.Version=%s", CPLANET_VERSION)
+#define cp_set_version(hdf_dest) hdf_set_valuef(hdf_dest, CP_VERSION, CPLANET_VERSION)
 
 /* CPlanet Getters */
 #define HDF_FOREACH(var, hdf, node) 		\
 	for ((var) = hdf_get_obj((hdf),node); 	\
-	     (var); 			\
+	     (var);				\
 	     (var) = hdf_obj_next((var)))
 
 #endif

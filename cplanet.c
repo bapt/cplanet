@@ -299,7 +299,7 @@ main (int argc, char *argv[])
 	lt = time(NULL);
 	ptr = localtime(&lt);
 	strftime(genDate, 256, "%a, %d %b %Y %H:%M:%S %z", ptr);
-	hdf_set_valuef(hdf, "CPlanet.GenerationDate=%s", genDate);
+	hdf_set_valuef(hdf, CP_GEN_DATE, genDate);
 
 	days = hdf_get_int_value(hdf,"CPlanet.Days",0);
 	days=days *  24 * 60 * 60;
