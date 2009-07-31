@@ -299,17 +299,9 @@ main (int argc, char *argv[])
 	ptr = localtime(&lt);
 	strftime(genDate, 256, "%a, %d %b %Y %H:%M:%S %z", ptr);
 	hdf_set_valuef(hdf, "CPlanet.GenerationDate=%s", genDate);
-	char *buf = hdf_get_valuef(hdf, "CPlanet.Days");
-	errno = 0;
-	char *ep;
-	long ldays = strtol(buf, &ep, 10);
-	if (buf[0] == '\0' || *ep != '\0')
-		err(1, "[%s]: not a number", buf);
-	ldays = ldays * 24 * 60 * 60;
-	if((errno == ERANGE && (ldays == LONG_MAX || ldays == LONG_MIN )) ||
-					(ldays > INT_MAX || ldays <INT_MIN))
-		cplanet_err(1, "[%s]: out of range", buf);
-	days = (int)ldays;
+	days = hdf_get_int_value(hdf,"CPlanet.Days",0);
+	days=days *  24 * 60 * 60;
+
 	feed_hdf = hdf_get_obj(hdf, "CPlanet.Feed.0");
 	pos = get_posts(feed_hdf, hdf, pos, days);
 	while ((feed_hdf = hdf_obj_next(feed_hdf)) != NULL) {
