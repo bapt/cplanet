@@ -291,7 +291,8 @@ main (int argc, char *argv[])
 		nerr_error_string(neoerr, &neoerr_str);
 		cplanet_err(-1, neoerr_str.buf);
 	}
-	hdf_set_valuef(hdf, "CPlanet.Version=%s", CPLANET_VERSION);
+	cp_set_version(hdf);
+
 	char genDate[256];
 	struct tm *ptr;
 	time_t lt;
@@ -299,21 +300,21 @@ main (int argc, char *argv[])
 	ptr = localtime(&lt);
 	strftime(genDate, 256, "%a, %d %b %Y %H:%M:%S %z", ptr);
 	hdf_set_valuef(hdf, "CPlanet.GenerationDate=%s", genDate);
+
 	days = hdf_get_int_value(hdf,"CPlanet.Days",0);
 	days=days *  24 * 60 * 60;
 
-	feed_hdf = hdf_get_obj(hdf, "CPlanet.Feed.0");
-	pos = get_posts(feed_hdf, hdf, pos, days);
-	while ((feed_hdf = hdf_obj_next(feed_hdf)) != NULL) {
+	HDF_FOREACH(feed_hdf,hdf,"CPlanet.Feed.0") {
 		pos = get_posts(feed_hdf, hdf, pos, days);
 	}
+
 	hdf_sort_obj(hdf_get_obj(hdf, "CPlanet.Posts"), sort_obj_by_date);
+
 	/* get every output set in the hdf file and generate them */
-	output_hdf = hdf_get_obj(hdf, "CPlanet.Output.0");
-	generate_file(output_hdf, hdf);
-	while ((output_hdf = hdf_obj_next(output_hdf)) != NULL) {
+	HDF_FOREACH(output_hdf,hdf,"CPlanet.Output.0") {
 		generate_file(output_hdf, hdf);
 	}
+
 	hdf_destroy(&hdf);
 	hdf_destroy(&feed_hdf);
 	hdf_destroy(&output_hdf);

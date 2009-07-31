@@ -43,7 +43,12 @@
 #define cp_set_formated_date(hdf_dest, ...) hdf_set_valuef(hdf_dest, CP_FORMATED_DATE, ##__VA_ARGS__)
 #define cp_set_description(hdf_dest, ...) hdf_set_valuef(hdf_dest, CP_DESCRIPTION, ##__VA_ARGS__)
 #define cp_set_tag(hdf_dest, ...) hdf_set_valuef(hdf_dest, CP_TAG, ##__VA_ARGS__)
+#define cp_set_version(hdf_dest) hdf_set_valuef(hdf_dest, "CPlanet.Version=%s", CPLANET_VERSION)
 
 /* CPlanet Getters */
+#define HDF_FOREACH(var, hdf, str) 		\
+	for ((var) = hdf_get_obj((hdf),str); 	\
+	     (var); 			\
+	     (var) = hdf_obj_next((var)))
 
 #endif
