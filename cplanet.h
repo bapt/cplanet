@@ -10,24 +10,23 @@
 #include <sys/stat.h>
 #include <syslog.h>
 #include <time.h>
+#include <locale.h>
 #include <unistd.h>
 
 /* libmrss */
 #include <mrss.h>
 
 /* clearsilver */
-#include <cs/cs.h>
-#include <util/neo_hdf.h>
-#include <util/neo_misc.h>
+#include <ClearSilver.h>
 
-#define CPLANET_VERSION "0.1"
+#define CPLANET_VERSION "0.2"
 
 #define CP_NAME "CPlanet.Posts.%i.Name=%s"
 #define CP_FEEDNAME "CPlanet.Posts.%i.FeedName=%s"
 #define CP_AUTHOR "CPlanet.Posts.%i.Author=%s"
 #define CP_TITLE "CPlanet.Posts.%i.Title=%s"
 #define CP_LINK "CPlanet.Posts.%i.Link=%s"
-#define CP_DATE "CPlanet.Posts.%i.Date=%s"
+#define CP_DATE "CPlanet.Posts.%i.Date=%lld"
 #define CP_FORMATED_DATE  "CPlanet.Posts.%i.FormatedDate=%s"
 #define CP_DESCRIPTION "CPlanet.Posts.%i.Description=%s"
 #define CP_TAG "CPlanet.Posts.%i.Tags.%i.Tag=%s"

@@ -5,18 +5,22 @@ CPlanet {
 		0 {
 			Path = ./samples/index.html
 			TemplatePath = ./samples/cplanet.cs
+			Type = HTML
 		}
 		1 {
 			Path = ./samples/cplanet.opml
 			TemplatePath = ./samples/cplanet-opml.cs
+			Type = OPML
 		}
 		2 { 
 			Path = ./samples/cplanet.rss
 			TemplatePath = ./samples/cplanet-rss.cs
+			Type = RSS
 		}
 		3 {
 			Path = ./samples/cplanet.atom
 			TemplatePath = ./samples/cplanet-atom.cs
+			Type = ATOM
 		}
 	}
 	URL =  http://planet.etoilebsd.net
@@ -35,7 +39,7 @@ CPlanet {
 		2 {
 			Name = BSDsx
 			Home = http://blog.bsdsx.fr
-			URL = http://blog.bsdsx.fr/index.atom
+			URL = http://blog.bsdsx.fr/index.rss
 		}
 		3 {
 			Name = iMil
@@ -46,6 +50,11 @@ CPlanet {
 			Name = Jadawin
 			Home = http://feeelog.tuxaco.net
 			URL = http://freelog.tuxaco.net/index.cgi/?flav=atom
+		}
+		5 {
+			Name = Bapt
+			Home = http://blog.etoilebsd.net
+			URL = http://blog.etoilebsd.net/index.rss
 		}
 	}
 }
