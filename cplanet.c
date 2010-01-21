@@ -364,7 +364,7 @@ main (int argc, char *argv[])
 				strftime(formated_date, 256, "%a, %d %b %Y %H:%M:%S %z", ptr);
 				hdf_set_valuef(post_hdf, "FormatedDate=%s", formated_date);
 			} else if (strcasecmp(type, "ATOM") == 0 ){
-				time_t posttime = hdf_get_int_value(hdf, "Date", time(NULL));
+				time_t posttime = hdf_get_int_value(post_hdf, "Date", time(NULL));
 				struct tm *date = gmtime(&posttime);
 				hdf_set_valuef(post_hdf, "FormatedDate=%04d-%02d-%02dT%02d:%02d:%02dZ",
 						date->tm_year + 1900, date->tm_mon + 1, date->tm_mday,
