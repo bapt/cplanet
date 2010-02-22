@@ -1,7 +1,0 @@
-- generate RSS using clearsilver template
-- generate OPML using clearsilver template
-- generate ATOM using cleansilver
-- add an option to log in syslog (for crontab users)
-- check every kind of errors : file not found, etc.
-- recheck all the free() and *_free() to avoid memory leaks
-- add info, verbose and debug flags

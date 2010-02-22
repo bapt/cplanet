@@ -1,46 +1,49 @@
-.TH CPlanet 1 "Jul 17, 2009"
-.SH NAME
-\fBCPlanet\fP \- a RSS Feed Aggregator to generate a planet
-.SH SYNOPSIS
-\fBcplanet\fP -c config.hdf [-l]
-.SH DESCRIPTION
-\fBCPlanet\fP is a RSS/ATOM feed aggregator written in C that generate static html
-files.
-.SS OPTIONS
-.TP
-\fB-c config.hdf\fP
-specify the path of th hdf configuration file
-.TP
-\fB-l\fP
-set the log to be written in syslog
-.SS HDF format
+.Dd Feb 22, 2010
+.Dt cplanet 1
+.Os
+.Sh NAME
+.Nm cplanet
+.Nd RSS Feed Aggregator that generate static html
+.Sh SYNOPSIS
+.Nm
+.Op Fl l
+.Fl c Ar config.hdf
+.Sh DESCRIPTION
+.Nm 
+is a RSS/ATOM feed aggregator written in C that generate static html files.
+.Sh OPTIONS
+.Bl -tag -width indent
+.It Fl c Ar config.hdf
+specify the path to the hdf configuration file
+.It Fl l
+set the log to be written in syslog, otherwise log are written to stderr
+.El
+.Sh CONFIGURATION FILE
+.Pp
 cplanet uses the clearsilver's hdf format as a configuration file, some keys are 
 mandatory. Users can add as much keys as they want as they can be used in the
 template file.
-.TP
-\fBCPlanet.Output.N.Path\fP 
+.Bl -tag -width indent
+.It Ar CPlanet.Output.N.Path
 N represents a number starting from 0, this is the patch for the file N to
 generate
-.TP
-\fBCPlanet.Output.N.TemplatePath\fP
+.It Ar CPlanet.Output.N.TemplatePath\
 Path of the template to use to generate the file number N
-.TP
-\fBCPlanet.Days\fP
+.It Ar CPlanet.Days
 oldest post from the feeds to keep in days.
-.TP
-\fBCPlanet.Feed.N.Name\fP
+.It Ar CPlanet.Feed.N.Name
 name of the N feed to fetch
-.TP
-\fBCPlanet.Feed.N.URL\fP
+.It Ar CPlanet.Feed.N.URL
 URL of the N Feed (ATOM or RSS) to fetch.
-.br
-.br
+.El
+.Pp
 for more informations concerning the HDF file format please refer to the
 clearsilver documentation: http://www.clearsilver.net/docs/man_hdf.hdf
-.SS Template File
-\fBCPlanet\fP uses the clearsilver template system, please refer to the
+.Sh TEMPLATE FILE
+.Nm
+uses the clearsilver template system, please refer to the
 clearsilver documentation: http://www.clearsilver.net/docs/man_templates.hdf
-.SH AUTHORS
+.Sh AUTHORS
 Baptiste Daroussin
-.SH CONTRIBUTORS
+.Sh CONTRIBUTORS
 Freddy DISSAUX
