@@ -145,7 +145,6 @@ str_to_UTF8(char *source_encoding, char *str)
 		return str;
 
 	iconv_t conv;
-	const char * inptr = str;
 	conv = iconv_open("UTF-8", source_encoding);
 	if (conv == (iconv_t)-1) {
 		cplanet_warn("Conversion from '%s' to UTF-8 not available", source_encoding);
@@ -160,7 +159,11 @@ str_to_UTF8(char *source_encoding, char *str)
 		cplanet_err(ENOMEM, "malloc");
 	memset(output, 0, outsize);
 	char *outputptr = output;
-	ret = iconv(conv, (const char**) &inptr, &insize, &outputptr, &outsize);
+#ifdef _LIBICONV_H
+	ret = iconv(conv, (const char **) &str, &insize, &outputptr, &outsize);
+#else
+	ret = iconv(conv, &str, &insize, &outputptr, &outsize);
+#endif
 	if (ret == (size_t)-1) {
 		cplanet_warn("Conversion Failed");
 		free(output);

@@ -17,6 +17,8 @@
 #ifndef CPLANET_H
 #define CPLANET_H 1
 
+#define _XOPEN_SOURCE
+#define _BSD_SOURCE
 #include <errno.h>
 #include <err.h>
 #include <iconv.h>
@@ -26,7 +28,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <syslog.h>
-#define _XOPEN_SOURCE
 #include <time.h>
 #include <locale.h>
 #include <unistd.h>
