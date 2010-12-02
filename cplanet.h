@@ -20,7 +20,7 @@
 #include <util/neo_hdf.h>
 #include <util/neo_misc.h>
 
-#define CPLANET_VERSION "0.1"
+#define CPLANET_VERSION "0.4"
 
 #define CP_NAME "CPlanet.Posts.%i.Name=%s"
 #define CP_FEEDNAME "CPlanet.Posts.%i.FeedName=%s"

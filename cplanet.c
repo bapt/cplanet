@@ -6,14 +6,54 @@
 
 /* vim:set ts=4 sw=4 sts=4: */
 
+#include <expat.h>
+#include <curl/curl.h>
+#include <stdbool.h>
+#include <sys/queue.h>
 #include "cplanet.h"
 
 #define W3_ATOM "http://www.w3.org/2005/Atom"
 #define PURL_ATOM "http://purl.org/atom/ns#"
 #define PURL_RSS "http://purl.org/rss/1.0/modules/content/"
 
+typedef enum {
+	NONE,
+	RSS,
+	ATOM,
+	UNKNOWN
+} feed_type;
+
+static char *atom_to_rfc822(const char *s);
+
 int syslog_flag = 0; /* 0 == log to stderr */
 STRING neoerr_str; /* neoerr to string */
+
+struct post {
+	char *title;
+	char *author;
+	char *link;
+	char *content;
+	char *description;
+	char *date;
+	char **tags;
+	int nbtags;
+	SLIST_ENTRY(post) next;
+};
+
+struct feed {
+	char *blog_title;
+	char *blog_subtitle;
+	char *encoding;
+	HDF *hdf;
+	char xmlpath[BUFSIZ];
+	feed_type type;
+	SLIST_HEAD(,post) entries;
+};
+
+struct buffer {
+	char *data;
+	size_t size;
+};
 
 void
 cplanet_err(int eval, const char* message, ...)
@@ -42,9 +82,300 @@ cplanet_warn(const char* message, ...)
 	va_end(args);
 }
 
-/* convert RFC822 to epoch time */
+static size_t
+write_to_buffer(void *ptr, size_t size, size_t memb, void *data) {
+	size_t realsize = size * memb;
+	struct buffer *mem = (struct buffer *)data;
 
-time_t
+	if ((mem->data = realloc(mem->data, mem->size + realsize + 1)) == NULL)
+		cplanet_err(1, "not enough memory");
+
+	memcpy(&(mem->data[mem->size]), ptr, realsize);
+	mem->size += realsize;
+	mem->data[mem->size] = '\0';
+
+	return (realsize);
+}
+
+static void
+post_free(struct post *post)
+{
+	int i;
+
+	for (i = 0; i < post->nbtags; i++) {
+		free(post->tags[i]);
+	}
+	if (post->tags != NULL)
+		free(post->tags);
+
+	if (post->title != NULL)
+		free(post->title);
+
+	if (post->author != NULL)
+		free(post->author);
+
+	if (post->link != NULL)
+		free(post->link);
+
+	if (post->date != NULL)
+		free(post->date);
+
+	if (post->content != NULL)
+		free(post->content);
+
+	if (post->description != NULL)
+		free(post->description);
+}
+
+struct post
+*post_init(void)
+{
+	struct post *post;
+
+	post = malloc(sizeof(struct post));
+	post->title = NULL;
+	post->author = NULL;
+	post->link = NULL;
+	post->date = NULL;
+	post->content = NULL;
+	post->description = NULL;
+	post->tags = NULL;
+	post->nbtags = 0;
+
+	return post;
+}
+
+static void
+post_add_tags(struct post *post, const char *data) {
+	post->nbtags++;
+
+	if (post->tags == NULL) {
+		post->tags = malloc(post->nbtags * sizeof(char *));
+	} else {
+		post->tags = realloc(post->tags, post->nbtags * sizeof(char *));
+	}
+
+	post->tags[post->nbtags - 1] = strdup(data);
+}
+
+static void
+parse_atom_el(struct feed *feed, const char *elt, const char **attr)
+{
+	int i;
+	bool getlink = false;
+	struct post *post;
+
+	if (!strcmp(feed->xmlpath, "/feed/entry")) {
+		post = post_init();
+		SLIST_INSERT_HEAD(&feed->entries, post, next);
+	}
+	if (!strcmp(feed->xmlpath, "/feed/entry/link")) {
+		for (i = 0; attr[i] != NULL; i++) {
+			if (!strcmp(attr[i], "rel")) {
+				i++;
+				if (!strcmp(attr[i], "alternate"))
+					getlink = true;
+			}
+			if (!strcmp(attr[i], "href") && getlink) {
+				i++;
+				post = SLIST_FIRST(&feed->entries);
+				post->link=strdup(attr[i]);
+			}
+		}
+	}
+
+	if (!strcmp(feed->xmlpath, "/feed/entry/category")) {
+		for (i = 0; attr[i] != NULL; i++) {
+			if (!strcmp(attr[i], "term")) {
+				i++;
+				post = SLIST_FIRST(&feed->entries);
+				post_add_tags(post, attr[i]);
+			}
+		}
+	}
+}
+
+static void
+parse_rss_el(struct feed *feed, const char *elt, const char **attr)
+{
+	struct post *post;
+
+	if (!strcmp(feed->xmlpath, "/rss/channel/item")) {
+		post = post_init();
+		SLIST_INSERT_HEAD(&feed->entries, post, next);
+	}
+}
+
+static void XMLCALL
+xml_startel(void *userdata, const char *elt, const char **attr)
+{
+	struct feed *feed = (struct feed *)userdata;
+
+	snprintf(feed->xmlpath, BUFSIZ, "%s/%s", feed->xmlpath, elt);
+
+	switch (feed->type) {
+		case NONE:
+			if (!strcmp(elt, "feed"))
+				feed->type = ATOM;
+			else if (!strcmp(elt, "rss"))
+				feed->type = RSS;
+			else
+				feed->type = UNKNOWN;
+			break;
+		case ATOM:
+			parse_atom_el(feed, elt, attr);
+			break;
+		case RSS:
+			parse_rss_el(feed, elt, attr);
+			break;
+		case UNKNOWN:
+			break;
+	}
+}
+
+static void XMLCALL
+xml_endel(void *userdata, const char *elt)
+{
+	struct feed *feed = (struct feed *)userdata;
+
+	feed->xmlpath[strlen(feed->xmlpath) - strlen(elt)]='\0';
+	if (feed->xmlpath[strlen(feed->xmlpath) - 1] != '/')
+		cplanet_err(1, "invalid xml"); /* TODO: change this to warnings */
+	else
+		feed->xmlpath[strlen(feed->xmlpath) - 1] = '\0';
+}
+
+static void XMLCALL
+xml_startdec(void *userdata, const char *version, const char *encoding, int standalone)
+{
+	struct feed *feed = (struct feed *)userdata;
+
+	feed->encoding = strdup(encoding);
+}
+
+static void
+push_data(char **key, const char *value)
+{
+	size_t size;
+
+	if (*key == NULL)
+		*key = strdup(value);
+	else {
+		size = strlen(*key) + strlen(value) + 1;
+		*key = realloc(*key, size);
+		strlcat(*key, value, size);
+	}
+}
+
+static void
+atom_data(struct feed *feed, const char *data)
+{
+	struct post *post;
+
+	if (!strcmp(feed->xmlpath, "/feed/title"))
+		push_data(&feed->blog_title, data);
+	if (!strcmp(feed->xmlpath, "/feed/entry/title")) {
+		post = SLIST_FIRST(&feed->entries);
+		push_data(&post->title, data);
+	}
+	if (!strcmp(feed->xmlpath, "/feed/entry/author/name")) {
+		post = SLIST_FIRST(&feed->entries);
+		push_data(&post->author, data);
+	}
+	if (!strcmp(feed->xmlpath, "/feed/entry/published")) {
+		post = SLIST_FIRST(&feed->entries);
+		post->date = atom_to_rfc822(data);
+	}
+	if (!strcmp(feed->xmlpath, "/feed/entry/content")) {
+		post = SLIST_FIRST(&feed->entries);
+		push_data(&post->content, data);
+	}
+}
+
+static void
+rss_data(struct feed *feed, const char *data)
+{
+	struct post *post;
+
+	if (!strcmp(feed->xmlpath, "/rss/channel/title"))
+		push_data(&feed->blog_title, data);
+	if (!strcmp(feed->xmlpath, "/rss/channel/item/title")) {
+		post = SLIST_FIRST(&feed->entries);
+		push_data(&post->title, data);
+	}
+	if (!strcmp(feed->xmlpath, "/rss/channel/item/dc:creator")) {
+		post = SLIST_FIRST(&feed->entries);
+		push_data(&post->author, data);
+	}
+	if (!strcmp(feed->xmlpath, "/rss/channel/item/link")) {
+		post = SLIST_FIRST(&feed->entries);
+		push_data(&post->link, data);
+	}
+	if (!strcmp(feed->xmlpath, "/rss/channel/item/pubDate")) {
+		post = SLIST_FIRST(&feed->entries);
+		push_data(&post->date, data);
+	}
+	if (!strcmp(feed->xmlpath, "/rss/channel/item/category")) {
+		post = SLIST_FIRST(&feed->entries);
+		post_add_tags(post, data);
+	}
+	if (!strcmp(feed->xmlpath, "/rss/channel/item/description")) {
+		post = SLIST_FIRST(&feed->entries);
+		push_data(&post->description, data);
+	}
+	if (!strcmp(feed->xmlpath, "/rss/channel/item/content:encoded")) {
+		post = SLIST_FIRST(&feed->entries);
+		push_data(&post->content, data);
+	}
+
+}
+
+static void XMLCALL
+xml_data(void *userdata, const char *s, int len)
+{
+	char *str;
+	struct feed *feed = (struct feed *)userdata;
+
+	str = malloc(len + 1);
+	strlcpy(str, s, len + 1);
+
+	switch (feed->type) {
+		case ATOM:
+			atom_data(feed, str);
+			break;
+		case RSS:
+			rss_data(feed, str);
+			break;
+		case NONE:
+		case UNKNOWN:
+			break;
+	}
+	free(str);
+}
+
+static char *
+atom_to_rfc822(const char *s)
+{
+	struct tm stm;
+	char datebuf[256];
+	if (!s)
+		return (NULL);
+
+	memset(&stm, 0, sizeof(stm));
+	if (sscanf(s, "%04d-%02d-%02dT%02d:%02d:%02dZ", &stm.tm_year,
+				&stm.tm_mon, &stm.tm_mday, &stm.tm_hour, &stm.tm_min,
+				&stm.tm_sec) == 6)
+	{
+		stm.tm_year -= 1900;
+		stm.tm_mon -= 1;
+		strftime (datebuf, sizeof (datebuf), "%a, %d %b %Y %H:%M:%S %z", &stm);
+		return strdup(datebuf);
+	}
+	return NULL;
+}
+
+/* convert RFC822 to epoch time */
+static time_t
 str_to_time_t(char *s)
 {
 	struct tm date;
@@ -60,17 +391,19 @@ str_to_time_t(char *s)
 		errno = EINVAL;
 		cplanet_err(1, "Convert struct tm (from '%s') to time_t failed", s);
 	}
+
 	return t;
 }
 
 /* sort posts by date */
 
-int 
+static int
 sort_obj_by_date(const void *a, const void *b) {
 	HDF **ha = (HDF **)a;
 	HDF **hb = (HDF **)b;
 	time_t atime = str_to_time_t(hdf_get_valuef(*ha, "Date"));
 	time_t btime = str_to_time_t(hdf_get_valuef(*hb, "Date"));
+
 	return (btime - atime);
 }
 
@@ -86,14 +419,14 @@ cplanet_output (void *ctx, char *s)
 	return neoerr;
 }
 
-char * 
+static char * 
 str_to_UTF8(char *source_encoding, char *str)
 {
 	size_t insize;
 	size_t outsize;
 	size_t ret;
 	char *output;
-	if (!strcmp(source_encoding, "UTF-8"))
+	if (!strcasecmp(source_encoding, "UTF-8"))
 		return str;
 
 	iconv_t conv;
@@ -124,6 +457,110 @@ str_to_UTF8(char *source_encoding, char *str)
 }
 
 /* retreive ports and prepare the dataset for the template */
+int
+fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
+{
+	CURL *curl;
+	CURLcode res;
+	struct buffer rawfeed;
+	struct XML_ParserStruct *parser;
+	struct feed feed;
+	struct post *post, *posttemp;
+	time_t t_now, t_comp;
+	int i;
+
+	char *date_format = hdf_get_valuef(hdf_dest, "CPlanet.DateFormat");
+
+	rawfeed.data = malloc(1);
+	rawfeed.size = 0;
+
+	feed.type = NONE;
+	feed.hdf = hdf_dest;
+	feed.blog_title = NULL;
+	feed.xmlpath[0]='\0';
+	SLIST_INIT(&feed.entries);
+
+	curl_global_init(CURL_GLOBAL_ALL);
+	if ((curl = curl_easy_init()) == NULL)
+		cplanet_err(1, "Unable to initalise curl");
+
+	curl_easy_setopt(curl, CURLOPT_URL, hdf_get_valuef(hdf_cfg, "URL"));
+	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10);
+	curl_easy_setopt(curl, CURLOPT_HEADER, 0);
+	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_to_buffer);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &rawfeed);
+	curl_easy_setopt(curl, CURLOPT_USERAGENT, "cplanet/"CPLANET_VERSION);
+
+	res = curl_easy_perform(curl);
+
+	if (res != CURLE_OK || rawfeed.size == 0) {
+		free(rawfeed.data);
+		curl_easy_cleanup(curl);
+		cplanet_warn("An error occured while fetching %s\n", hdf_get_valuef(hdf_cfg, "URL"));
+		return pos;
+	}
+
+	if ((parser = XML_ParserCreate(NULL)) == NULL)
+		cplanet_err(1, "Unable to initialise expat");
+
+	XML_SetXmlDeclHandler(parser, xml_startdec);
+	XML_SetStartElementHandler(parser, xml_startel);
+	XML_SetEndElementHandler(parser, xml_endel);
+	XML_SetCharacterDataHandler(parser, xml_data);
+	XML_SetUserData(parser, &feed);
+
+	if (XML_Parse(parser, rawfeed.data, rawfeed.size, true) == XML_STATUS_ERROR)
+		cplanet_err(1, "Parse error at line %lu: %s",
+				XML_GetCurrentLineNumber(parser),
+				XML_ErrorString(XML_GetErrorCode(parser)));
+
+	time(&t_now);
+	SLIST_FOREACH_SAFE(post, &feed.entries, next, posttemp) {
+		if (post->date == NULL) {
+			SLIST_REMOVE(&feed.entries, post, post, next);
+			continue;
+		}
+
+		t_comp = str_to_time_t(post->date);
+		if (t_now - t_comp < days) {
+			cp_set_name(hdf_dest, pos, hdf_get_valuef(hdf_cfg, "Name"));
+			cp_set_feedname(hdf_dest, pos, str_to_UTF8(feed.encoding, feed.blog_title));
+
+			if (post->author != NULL)
+				cp_set_author(hdf_dest, pos, str_to_UTF8(feed.encoding, post->author));
+
+			cp_set_title(hdf_dest, pos, str_to_UTF8(feed.encoding, post->title));
+			cp_set_link(hdf_dest, pos, post->link);
+			cp_set_date(hdf_dest, pos, post->date);
+			if (date_format != NULL) {
+				char formated_date[256];
+				struct tm *ptr;
+				ptr = localtime(&t_comp);
+				strftime(formated_date, 256, date_format, ptr);
+				cp_set_formated_date(hdf_dest, pos, formated_date);
+			}
+
+			if (post->content != NULL)
+				cp_set_description(hdf_dest, pos, str_to_UTF8(feed.encoding, post->content));
+			else if (post->description != NULL)
+				cp_set_description(hdf_dest, pos, str_to_UTF8(feed.encoding, post->description));
+
+			for (i = 0; i < post->nbtags; i++)
+				cp_set_tag(hdf_dest, pos, i, str_to_UTF8(feed.encoding, post->tags[i]));
+
+			pos++;
+		}
+
+		SLIST_REMOVE(&feed.entries, post, post, next);
+		post_free(post);
+	}
+
+	XML_ParserFree(parser);
+
+	return pos;
+};
 
 int 
 get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
@@ -147,6 +584,7 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 	for (item = feed->item; item; item = item->next) {
 		time_t t_now, t_comp;
 		t_comp = str_to_time_t(item->pubDate);
+		printf("%s\n", item->pubDate);
 		time(&t_now);
 		if(t_now - t_comp >= days)
 			continue;
@@ -305,7 +743,8 @@ main (int argc, char *argv[])
 	days=days *  24 * 60 * 60;
 
 	HDF_FOREACH(feed_hdf,hdf,"CPlanet.Feed.0") {
-		pos = get_posts(feed_hdf, hdf, pos, days);
+//		pos = get_posts(feed_hdf, hdf, pos, days);
+		pos = fetch_posts(feed_hdf, hdf, pos, days);
 	}
 
 	hdf_sort_obj(hdf_get_obj(hdf, "CPlanet.Posts"), sort_obj_by_date);
