@@ -10,13 +10,13 @@
 		 <?cs each:post = CPlanet.Posts ?>
 		 <item>
 			 <title><?cs var:post.FeedName ?> >> <?cs var:post.Title ?></title>
-			 <description><![CDATA[<?cs var:post.Description ?>]]></description>
+			 <description><?cs var:html_escape(post.Description) ?></description>
 			 <link><?cs var:post.Link ?></link>
 			 <guid><?cs var:post.Link ?></guid>
 			 <?cs each:tags = post.Tags ?>
 			 <category><?cs var:tags.Tag ?></category>
 			 <?cs /each ?>
-			 <pubDate><?cs var:post.Date ?></pubDate>
+			 <pubDate><?cs var:post.FormatedDate ?></pubDate>
 		 </item>
 		 <?cs /each ?>
 	</channel>

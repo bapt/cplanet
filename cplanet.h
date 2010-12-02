@@ -1,6 +1,25 @@
+/*
+ * Copyright (c) 2010, Baptiste Daroussin
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
 #ifndef CPLANET_H
 #define CPLANET_H 1
 
+#define _XOPEN_SOURCE
+#define _BSD_SOURCE
+#include <errno.h>
 #include <err.h>
 #include <iconv.h>
 #include <limits.h>
@@ -10,15 +29,14 @@
 #include <sys/stat.h>
 #include <syslog.h>
 #include <time.h>
+#include <locale.h>
 #include <unistd.h>
 
 /* libmrss */
 #include <mrss.h>
 
 /* clearsilver */
-#include <cs/cs.h>
-#include <util/neo_hdf.h>
-#include <util/neo_misc.h>
+#include <ClearSilver.h>
 
 #define CPLANET_VERSION "0.4"
 

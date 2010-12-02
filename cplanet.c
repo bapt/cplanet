@@ -1,8 +1,18 @@
-/* This program is free software. It comes without any warranty, to
- * the extent permitted by applicable law. You can redistribute it
- * and/or modify it under the terms of the Do What The Fuck You Want
- * To Public License, Version 2, as published by Sam Hocevar. See
- * http://sam.zoy.org/wtfpl/COPYING for more details. */ 
+/*
+ * Copyright (c) 2010, Baptiste Daroussin
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
 
 /* vim:set ts=4 sw=4 sts=4: */
 
@@ -374,22 +384,61 @@ atom_to_rfc822(const char *s)
 	return NULL;
 }
 
-/* convert RFC822 to epoch time */
-static time_t
-str_to_time_t(char *s)
+/* convert the iso format as the RFC3339 is a subset of it */
+time_t
+iso8601_to_time_t(char *s)
 {
 	struct tm date;
 	time_t t;
 	errno = 0;
-	char *pos = strptime(s, "%a, %d %b %Y %T", &date);
+	char *pos = strptime(s, "%Y-%m-%dT%H:%M:%S.%fZ", &date);
+	if (pos == NULL) {
+		/* Modify the last HH:MM to HHMM if necessary */
+		if (s[strlen(s) - 3] == ':' ) {
+			s[strlen(s) - 3] = s[strlen(s) - 2];
+			s[strlen(s) - 2] = s[strlen(s) - 1];
+			s[strlen(s) - 1] = '\0';
+		}
+		pos =strptime(s, "%Y-%m-%dT%H:%M:%S%z", &date);
+	}
 	if (pos == NULL) {
 		errno = EINVAL;
-		cplanet_err(1, "Convert '%s' to struct tm failed", s);
+		cplanet_warn("Convert  ISO8601 '%s' to struct tm failed", s);
+		return 0;
 	}
 	t = mktime(&date);
 	if (t == (time_t)-1) {
 		errno = EINVAL;
-		cplanet_err(1, "Convert struct tm (from '%s') to time_t failed", s);
+		cplanet_warn("Convert struct tm (from '%s') to time_t failed", s);
+		return 0;
+	}
+	return t;
+}
+
+/* convert RFC822 to epoch time */
+time_t
+rfc822_to_time_t(char *s)
+{
+	struct tm date;
+	time_t t;
+	errno = 0;
+
+	if (s == NULL) {
+		cplanet_warn("Invalide empty date");
+		return 0;
+	}
+
+	char *pos = strptime(s, "%a, %d %b %Y %T", &date);
+	if (pos == NULL) {
+		errno = EINVAL;
+		cplanet_warn("Convert RFC822 '%s' to struct tm failed", s);
+		return 0;
+	}
+	t = mktime(&date);
+	if (t == (time_t)-1) {
+		errno = EINVAL;
+		cplanet_warn("Convert struct tm (from '%s') to time_t failed", s);
+		return 0;
 	}
 
 	return t;
@@ -397,13 +446,12 @@ str_to_time_t(char *s)
 
 /* sort posts by date */
 
-static int
+int
 sort_obj_by_date(const void *a, const void *b) {
 	HDF **ha = (HDF **)a;
 	HDF **hb = (HDF **)b;
-	time_t atime = str_to_time_t(hdf_get_valuef(*ha, "Date"));
-	time_t btime = str_to_time_t(hdf_get_valuef(*hb, "Date"));
-
+	time_t atime = hdf_get_int_value(*ha, "Date",0);
+	time_t btime = hdf_get_int_value(*hb, "Date",0);
 	return (btime - atime);
 }
 
@@ -430,7 +478,6 @@ str_to_UTF8(char *source_encoding, char *str)
 		return str;
 
 	iconv_t conv;
-	const char * inptr = str;
 	conv = iconv_open("UTF-8", source_encoding);
 	if (conv == (iconv_t)-1) {
 		cplanet_warn("Conversion from '%s' to UTF-8 not available", source_encoding);
@@ -445,7 +492,11 @@ str_to_UTF8(char *source_encoding, char *str)
 		cplanet_err(ENOMEM, "malloc");
 	memset(output, 0, outsize);
 	char *outputptr = output;
-	ret = iconv(conv, (const char**) &inptr, &insize, &outputptr, &outsize);
+#ifdef _LIBICONV_H
+	ret = iconv(conv, (const char **) &str, &insize, &outputptr, &outsize);
+#else
+	ret = iconv(conv, &str, &insize, &outputptr, &outsize);
+#endif
 	if (ret == (size_t)-1) {
 		cplanet_warn("Conversion Failed");
 		free(output);
@@ -523,7 +574,7 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 			continue;
 		}
 
-		t_comp = str_to_time_t(post->date);
+		t_comp = rfc822_to_time_t(post->date);
 		if (t_now - t_comp < days) {
 			cp_set_name(hdf_dest, pos, hdf_get_valuef(hdf_cfg, "Name"));
 			cp_set_feedname(hdf_dest, pos, str_to_UTF8(feed.encoding, feed.blog_title));
@@ -571,7 +622,6 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 	CURLcode code;
 	char *encoding;
 	char *name = hdf_get_valuef(hdf_cfg, "Name");
-	char *date_format = hdf_get_valuef(hdf_dest, "CPlanet.DateFormat");
 	ret = mrss_parse_url_with_options_and_error(hdf_get_valuef(hdf_cfg, "URL"), &feed, NULL, &code);
 	if (ret) {
 		cplanet_warn("MRSS return error: %s, %s\n",
@@ -583,8 +633,16 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 	encoding = feed->encoding;
 	for (item = feed->item; item; item = item->next) {
 		time_t t_now, t_comp;
-		t_comp = str_to_time_t(item->pubDate);
-		printf("%s\n", item->pubDate);
+		if (item->pubDate == NULL) {
+			cplanet_warn("Invalid date format in the %s feed: skeeping", hdf_get_valuef(hdf_cfg, "Name"));
+			continue;
+		}
+		/* when the feed is not corrupted, mrss stores it in RFC822 format */
+		t_comp = rfc822_to_time_t(item->pubDate);
+		if (t_comp == 0) {
+			cplanet_warn("Invalid date format in the %s feed: skeeping", hdf_get_valuef(hdf_cfg, "Name"));
+			continue;
+		}
 		time(&t_now);
 		if(t_now - t_comp >= days)
 			continue;
@@ -596,16 +654,7 @@ get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
 			cp_set_author(hdf_dest, pos, str_to_UTF8(encoding, item->author));
 		cp_set_title(hdf_dest, pos, str_to_UTF8(encoding, item->title));
 		cp_set_link(hdf_dest, pos, item->link);
-		cp_set_date(hdf_dest, pos, item->pubDate);
-		if (date_format != NULL) {
-			char formated_date[256];
-			struct tm *ptr;
-			time_t time;
-			time = str_to_time_t(item->pubDate);
-			ptr = localtime(&time);
-			strftime(formated_date, 256, date_format, ptr);
-			cp_set_formated_date(hdf_dest, pos, formated_date);
-		}
+		/*cp_set_date(hdf_dest, pos, (long long int)t_comp);*/
 		/* Description is only for description tag, we want content if exists */
 		if (feed->version == MRSS_VERSION_ATOM_0_3 || feed->version == MRSS_VERSION_ATOM_1_0) {
 			if ((mrss_search_tag(item, "content", W3_ATOM, &content) == MRSS_OK && content) || 
@@ -644,16 +693,26 @@ generate_file(HDF *output_hdf, HDF *hdf)
 	STRING cs_output_data;
 	string_init(&cs_output_data);
 	neoerr = cs_init(&parse, hdf);
-	if (neoerr != STATUS_OK) 
+	if (neoerr != STATUS_OK)
 		goto warn1;
+
 	char *cs_output = hdf_get_valuef(output_hdf, "Path");
 	char *cs_path = hdf_get_valuef(output_hdf, "TemplatePath");
+	neoerr = cgi_register_strfuncs(parse);
+
+	if (neoerr != STATUS_OK)
+		goto warn0;
+
 	neoerr = cs_parse_file(parse, cs_path);
-	if (neoerr != STATUS_OK) 
+
+	if (neoerr != STATUS_OK)
 		goto warn0;
+
 	neoerr = cs_render(parse, &cs_output_data, cplanet_output);
-	if (neoerr != STATUS_OK) 
+
+	if (neoerr != STATUS_OK)
 		goto warn0;
+
 	FILE *output = fopen(cs_output, "w+");
 	if (output == NULL)
 		cplanet_err(1, "%s", cs_output);
@@ -662,6 +721,7 @@ generate_file(HDF *output_hdf, HDF *hdf)
 	fclose(output);
 	cs_destroy(&parse);
 	string_clear(&cs_output_data);
+
 	return;
 
 warn0:
@@ -686,6 +746,7 @@ main (int argc, char *argv[])
 	HDF *hdf;
 	HDF *feed_hdf;
 	HDF *output_hdf;
+	HDF *post_hdf;
 	int pos = 0;
 	int days = 0;
 	int ch = 0;
@@ -721,8 +782,6 @@ main (int argc, char *argv[])
 		nerr_error_string(neoerr, &neoerr_str);
 		cplanet_err(-1, neoerr_str.buf);
 	}
-	neoerr = hdf_init(&feed_hdf);
-
 	/* Read the hdf file */
 	neoerr = hdf_read_file(hdf, hdf_file);
 	if (neoerr != STATUS_OK) {
@@ -730,14 +789,6 @@ main (int argc, char *argv[])
 		cplanet_err(-1, neoerr_str.buf);
 	}
 	cp_set_version(hdf);
-
-	char genDate[256];
-	struct tm *ptr;
-	time_t lt;
-	lt = time(NULL);
-	ptr = localtime(&lt);
-	strftime(genDate, 256, "%a, %d %b %Y %H:%M:%S %z", ptr);
-	hdf_set_valuef(hdf, CP_GEN_DATE, genDate);
 
 	days = hdf_get_int_value(hdf,"CPlanet.Days",0);
 	days=days *  24 * 60 * 60;
@@ -751,12 +802,58 @@ main (int argc, char *argv[])
 
 	/* get every output set in the hdf file and generate them */
 	HDF_FOREACH(output_hdf,hdf,"CPlanet.Output.0") {
+		/* format the date according to the output type */
+		char *type = hdf_get_value(output_hdf, "Type", "HTML");
+		/* for the posts */
+		HDF_FOREACH(post_hdf, hdf, "CPlanet.Posts.0") {
+			if(strcasecmp(type, "RSS") == 0) {
+				setlocale(LC_ALL, "C");
+				time_t date = (time_t)hdf_get_int_value(post_hdf, "Date", time(NULL));
+				char formated_date[256];
+				/* format to RFC822 */
+				struct tm *ptr = gmtime(&date);
+				strftime(formated_date, 256, "%a, %d %b %Y %H:%M:%S %z", ptr);
+				hdf_set_valuef(post_hdf, "FormatedDate=%s", formated_date);
+			} else if (strcasecmp(type, "ATOM") == 0 ){
+				time_t posttime = hdf_get_int_value(post_hdf, "Date", time(NULL));
+				struct tm *date = gmtime(&posttime);
+				hdf_set_valuef(post_hdf, "FormatedDate=%04d-%02d-%02dT%02d:%02d:%02dZ",
+						date->tm_year + 1900, date->tm_mon + 1, date->tm_mday,
+						date->tm_hour, date->tm_min, date->tm_sec);
+			} else {
+				/* case html */
+				char *date_format = hdf_get_value(hdf, "CPlanet.DateFormat", "%F at %T");
+				time_t posttime = hdf_get_int_value(hdf, "Date", time(NULL));
+				char formated_date[256];
+				struct tm *ptr;
+				ptr = localtime(&posttime);
+				strftime(formated_date, 256, date_format, ptr);
+				hdf_set_valuef(post_hdf, "FormatedDate=%s", formated_date);
+			}
+		}
+		/* the the publication date */
+		char genDate[256];
+		time_t lt;
+		struct tm *ptr;
+		lt = time(NULL);
+		ptr = gmtime(&lt);
+		if (strcasecmp(type, "RSS") == 0) {
+			strftime(genDate, 256, "%a, %d %b %Y %H:%M:%S %z", ptr);
+			hdf_set_valuef(hdf, CP_GEN_DATE, genDate);
+		} else if (strcasecmp(type, "ATOM") == 0) {
+			hdf_set_valuef(hdf,"CPlanet.GenerationDate=%04d-%02d-%02dT%02d:%02d:%02dZ",
+					ptr->tm_year + 1900, ptr->tm_mon + 1, ptr->tm_mday,
+					ptr->tm_hour, ptr->tm_min, ptr->tm_sec);
+		} else {
+			char *date_format = hdf_get_value(hdf, "CPlanet.DateFormat", "%F at %T");
+			ptr = localtime(&lt);
+			strftime(genDate, 256, date_format, ptr);
+			hdf_set_valuef(hdf, CP_GEN_DATE, genDate);
+		}
 		generate_file(output_hdf, hdf);
 	}
 
 	hdf_destroy(&hdf);
-	hdf_destroy(&feed_hdf);
-	hdf_destroy(&output_hdf);
 
 	if (syslog_flag)
 		closelog();
