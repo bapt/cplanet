@@ -2,12 +2,12 @@
 <opml version="1.1">
 <head>
 	<title><?cs var:CPlanet.Name ?></title>
-	<dateCreated><?cs var:CPlanet.GenerationDate ?></dateCreated>
-	<dateModified><?cs var:CPlanet.GenerationDate ?></dateModified>
+	<dateCreated><?cs var:CPlanet.GenerationDateRFC822 ?></dateCreated>
+	<dateModified><?cs var:CPlanet.GenerationDateRFC822 ?></dateModified>
 </head>
 <body>
 	<?cs each:feed = CPlanet.Feed ?>
-	<outline text="<?cs var:feed.Name ?>" type="rss" htmlUrl="<?cs var:feed.Home ?>" xmlUrl="<?cs var:feed.URL ?>" />
+	<outline text="<?cs var:feed.Name ?>" htmlUrl="<?cs var:feed.Home ?>" xmlUrl="<?cs var:feed.URL ?>" />
 	<?cs /each ?>
 </body>
 </opml>
