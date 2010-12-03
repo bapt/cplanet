@@ -6,17 +6,17 @@
 		<description><?cs var:CPlanet.Description ?></description>
 		 <language>en</language>
 		 <generator>CPlanet <?cs var:CPlanet.Version ?></generator>
-		 <lastBuildDate><?cs var:CPlanet.GenerationDate ?></lastBuildDate>
+		 <lastBuildDate><?cs var:CPlanet.GenerationDateRFC822 ?></lastBuildDate>
 		 <?cs each:post = CPlanet.Posts ?>
 		 <item>
-			 <title><?cs var:post.FeedName ?> >> <?cs var:post.Title ?></title>
-			 <description><?cs var:html_escape(post.Description) ?></description>
+			 <title><?cs var:post.FeedName ?> &gt; <![CDATA[<?cs var:post.Title ?>]]></title>
+			 <description><![CDATA[<?cs var:post.Description ?>]]></description>
 			 <link><?cs var:post.Link ?></link>
 			 <guid><?cs var:post.Link ?></guid>
 			 <?cs each:tags = post.Tags ?>
 			 <category><?cs var:tags.Tag ?></category>
 			 <?cs /each ?>
-			 <pubDate><?cs var:post.FormatedDate ?></pubDate>
+			 <pubDate><?cs var:post.DateRFC822 ?></pubDate>
 		 </item>
 		 <?cs /each ?>
 	</channel>

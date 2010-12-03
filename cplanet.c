@@ -33,10 +33,8 @@ typedef enum {
 	UNKNOWN
 } feed_type;
 
-static char *atom_to_rfc822(const char *s);
-
-int syslog_flag = 0; /* 0 == log to stderr */
-STRING neoerr_str; /* neoerr to string */
+static int syslog_flag = 0; /* 0 == log to stderr */
+static STRING neoerr_str; /* neoerr to string */
 
 struct post {
 	char *title;
@@ -65,7 +63,7 @@ struct buffer {
 	size_t size;
 };
 
-void
+static void
 cplanet_err(int eval, const char* message, ...)
 {
 	va_list args;
@@ -75,12 +73,12 @@ cplanet_err(int eval, const char* message, ...)
 		exit(eval);
 		/* NOTREACHED */
 	} else {
-		verr(eval, message, args);
+		verrx(eval, message, args);
 		/* NOTREACHED */
 	}
 }
 
-void
+static void
 cplanet_warn(const char* message, ...)
 {
 	va_list args;
@@ -88,7 +86,7 @@ cplanet_warn(const char* message, ...)
 	if (syslog_flag)
 		vsyslog(LOG_WARNING, message, args);
 	else
-		vwarn(message, args);
+		vwarnx(message, args);
 	va_end(args);
 }
 
@@ -137,7 +135,7 @@ post_free(struct post *post)
 		free(post->description);
 }
 
-struct post
+static struct post
 *post_init(void)
 {
 	struct post *post;
@@ -174,6 +172,7 @@ parse_atom_el(struct feed *feed, const char *elt, const char **attr)
 	int i;
 	bool getlink = false;
 	struct post *post;
+	char *url = NULL;
 
 	if (!strcmp(feed->xmlpath, "/feed/entry")) {
 		post = post_init();
@@ -186,11 +185,17 @@ parse_atom_el(struct feed *feed, const char *elt, const char **attr)
 				if (!strcmp(attr[i], "alternate"))
 					getlink = true;
 			}
-			if (!strcmp(attr[i], "href") && getlink) {
+			if (!strcmp(attr[i], "href")) {
 				i++;
-				post = SLIST_FIRST(&feed->entries);
-				post->link=strdup(attr[i]);
+				url=strdup(attr[i]);
 			}
+		}
+		if (getlink && url != NULL) {
+			post = SLIST_FIRST(&feed->entries);
+			post->link = url;
+		} else {
+			if (url != NULL)
+				free(url);
 		}
 	}
 
@@ -294,7 +299,7 @@ atom_data(struct feed *feed, const char *data)
 	}
 	if (!strcmp(feed->xmlpath, "/feed/entry/published")) {
 		post = SLIST_FIRST(&feed->entries);
-		post->date = atom_to_rfc822(data);
+		push_data(&post->date, data);
 	}
 	if (!strcmp(feed->xmlpath, "/feed/entry/content")) {
 		post = SLIST_FIRST(&feed->entries);
@@ -363,35 +368,15 @@ xml_data(void *userdata, const char *s, int len)
 	free(str);
 }
 
-static char *
-atom_to_rfc822(const char *s)
-{
-	struct tm stm;
-	char datebuf[256];
-	if (!s)
-		return (NULL);
-
-	memset(&stm, 0, sizeof(stm));
-	if (sscanf(s, "%04d-%02d-%02dT%02d:%02d:%02dZ", &stm.tm_year,
-				&stm.tm_mon, &stm.tm_mday, &stm.tm_hour, &stm.tm_min,
-				&stm.tm_sec) == 6)
-	{
-		stm.tm_year -= 1900;
-		stm.tm_mon -= 1;
-		strftime (datebuf, sizeof (datebuf), "%a, %d %b %Y %H:%M:%S %z", &stm);
-		return strdup(datebuf);
-	}
-	return NULL;
-}
-
 /* convert the iso format as the RFC3339 is a subset of it */
-time_t
+static time_t
 iso8601_to_time_t(char *s)
 {
 	struct tm date;
 	time_t t;
+	int garbage;
 	errno = 0;
-	char *pos = strptime(s, "%Y-%m-%dT%H:%M:%S.%fZ", &date);
+	char *pos = strptime(s, "%FT%TZ", &date);
 	if (pos == NULL) {
 		/* Modify the last HH:MM to HHMM if necessary */
 		if (s[strlen(s) - 3] == ':' ) {
@@ -399,7 +384,19 @@ iso8601_to_time_t(char *s)
 			s[strlen(s) - 2] = s[strlen(s) - 1];
 			s[strlen(s) - 1] = '\0';
 		}
-		pos =strptime(s, "%Y-%m-%dT%H:%M:%S%z", &date);
+		pos = strptime(s, "%FT%T%z", &date);
+
+	}
+	if (pos == NULL) {
+		memset(&date, 0, sizeof(date));
+		if (sscanf(s, "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ", &date.tm_year,
+					&date.tm_mon, &date.tm_mday, &date.tm_hour, &date.tm_min,
+					&date.tm_sec, &garbage) == 7) {
+			date.tm_year -= 1900;
+			date.tm_mon -= 1;
+			pos = s;
+		}
+
 	}
 	if (pos == NULL) {
 		errno = EINVAL;
@@ -416,7 +413,7 @@ iso8601_to_time_t(char *s)
 }
 
 /* convert RFC822 to epoch time */
-time_t
+static time_t
 rfc822_to_time_t(char *s)
 {
 	struct tm date;
@@ -446,7 +443,7 @@ rfc822_to_time_t(char *s)
 
 /* sort posts by date */
 
-int
+static int
 sort_obj_by_date(const void *a, const void *b) {
 	HDF **ha = (HDF **)a;
 	HDF **hb = (HDF **)b;
@@ -508,7 +505,7 @@ str_to_UTF8(char *source_encoding, char *str)
 }
 
 /* retreive ports and prepare the dataset for the template */
-int
+static int
 fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 {
 	CURL *curl;
@@ -518,6 +515,7 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 	struct feed feed;
 	struct post *post, *posttemp;
 	time_t t_now, t_comp;
+	char datestr[256];
 	int i;
 
 	char *date_format = hdf_get_valuef(hdf_dest, "CPlanet.DateFormat");
@@ -574,7 +572,11 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 			continue;
 		}
 
-		t_comp = rfc822_to_time_t(post->date);
+		if (feed.type == RSS)
+			t_comp = rfc822_to_time_t(post->date);
+		else
+			t_comp = iso8601_to_time_t(post->date);
+
 		if (t_now - t_comp < days) {
 			cp_set_name(hdf_dest, pos, hdf_get_valuef(hdf_cfg, "Name"));
 			cp_set_feedname(hdf_dest, pos, str_to_UTF8(feed.encoding, feed.blog_title));
@@ -584,13 +586,17 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 
 			cp_set_title(hdf_dest, pos, str_to_UTF8(feed.encoding, post->title));
 			cp_set_link(hdf_dest, pos, post->link);
-			cp_set_date(hdf_dest, pos, post->date);
+			cp_set_date(hdf_dest, pos, t_comp);
+
+			setlocale(LC_ALL, "C");
+			time_to_iso8601(&t_comp, datestr, 256);
+			cp_set_date_iso8601(hdf_dest, pos, datestr);
+			time_to_rfc822(&t_comp, datestr, 256);
+			cp_set_date_rfc822(hdf_dest, pos, datestr);
+
 			if (date_format != NULL) {
-				char formated_date[256];
-				struct tm *ptr;
-				ptr = localtime(&t_comp);
-				strftime(formated_date, 256, date_format, ptr);
-				cp_set_formated_date(hdf_dest, pos, formated_date);
+				time_format(&t_comp, datestr, 256, date_format);
+				cp_set_formated_date(hdf_dest, pos, datestr);
 			}
 
 			if (post->content != NULL)
@@ -612,78 +618,6 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 
 	return pos;
 };
-
-int 
-get_posts(HDF *hdf_cfg, HDF* hdf_dest, int pos, int days)
-{
-	mrss_t *feed;
-	mrss_error_t ret;
-	mrss_item_t *item;
-	CURLcode code;
-	char *encoding;
-	char *name = hdf_get_valuef(hdf_cfg, "Name");
-	ret = mrss_parse_url_with_options_and_error(hdf_get_valuef(hdf_cfg, "URL"), &feed, NULL, &code);
-	if (ret) {
-		cplanet_warn("MRSS return error: %s, %s\n",
-				ret ==
-				MRSS_ERR_DOWNLOAD ? mrss_curl_strerror(code) :
-				mrss_strerror(ret), name);
-		return pos;
-	}
-	encoding = feed->encoding;
-	for (item = feed->item; item; item = item->next) {
-		time_t t_now, t_comp;
-		if (item->pubDate == NULL) {
-			cplanet_warn("Invalid date format in the %s feed: skeeping", hdf_get_valuef(hdf_cfg, "Name"));
-			continue;
-		}
-		/* when the feed is not corrupted, mrss stores it in RFC822 format */
-		t_comp = rfc822_to_time_t(item->pubDate);
-		if (t_comp == 0) {
-			cplanet_warn("Invalid date format in the %s feed: skeeping", hdf_get_valuef(hdf_cfg, "Name"));
-			continue;
-		}
-		time(&t_now);
-		if(t_now - t_comp >= days)
-			continue;
-		mrss_category_t *tags;
-		mrss_tag_t *content; 
-		cp_set_name(hdf_dest, pos, name);
-		cp_set_feedname(hdf_dest, pos, str_to_UTF8(encoding, feed->title));
-		if (item->author != NULL)
-			cp_set_author(hdf_dest, pos, str_to_UTF8(encoding, item->author));
-		cp_set_title(hdf_dest, pos, str_to_UTF8(encoding, item->title));
-		cp_set_link(hdf_dest, pos, item->link);
-		/*cp_set_date(hdf_dest, pos, (long long int)t_comp);*/
-		/* Description is only for description tag, we want content if exists */
-		if (feed->version == MRSS_VERSION_ATOM_0_3 || feed->version == MRSS_VERSION_ATOM_1_0) {
-			if ((mrss_search_tag(item, "content", W3_ATOM, &content) == MRSS_OK && content) || 
-					(mrss_search_tag(item, "content", PURL_ATOM, &content) == MRSS_OK && content)) {
-				cp_set_description(hdf_dest, pos, str_to_UTF8(encoding, content->value));
-			} else {
-				cp_set_description(hdf_dest, pos, str_to_UTF8(encoding, item->description));
-			}
-		} else {
-			if (mrss_search_tag(item, "encoded", PURL_RSS, &content) == MRSS_OK && content) {
-				cp_set_description(hdf_dest, pos, str_to_UTF8(encoding, content->value));
-			} else {
-				cp_set_description(hdf_dest, pos, str_to_UTF8(encoding, item->description));
-			}
-		}
-		mrss_free(content);
-		/* Get the categories/tags */
-		int nb_tags = 0;
-		for (tags = item->category; tags; nb_tags++, tags = tags->next) {
-			cp_set_tag(hdf_dest, pos, nb_tags, str_to_UTF8(encoding, tags->category));
-		}
-		mrss_free(tags);
-		pos++;
-	}
-	mrss_free(item);
-
-	return pos;
-}
-
 
 void
 generate_file(HDF *output_hdf, HDF *hdf)
@@ -746,13 +680,19 @@ main (int argc, char *argv[])
 	HDF *hdf;
 	HDF *feed_hdf;
 	HDF *output_hdf;
-	HDF *post_hdf;
 	int pos = 0;
 	int days = 0;
 	int ch = 0;
 	char *hdf_file = NULL;
+	char datestr[256];
+	time_t t_now;
+	char *date_format = NULL;
+
+	t_now = time(NULL);
+
 	if (argc == 1)
 		usage();
+
 	while ((ch = getopt(argc, argv, "c:lh")) != -1)
 		switch (ch) {  
 			case 'h':
@@ -790,66 +730,26 @@ main (int argc, char *argv[])
 	}
 	cp_set_version(hdf);
 
+	date_format  = hdf_get_valuef(hdf, "CPlanet.DateFormat");
 	days = hdf_get_int_value(hdf,"CPlanet.Days",0);
 	days=days *  24 * 60 * 60;
 
-	HDF_FOREACH(feed_hdf,hdf,"CPlanet.Feed.0") {
-//		pos = get_posts(feed_hdf, hdf, pos, days);
+	HDF_FOREACH(feed_hdf,hdf,"CPlanet.Feed.0")
 		pos = fetch_posts(feed_hdf, hdf, pos, days);
-	}
 
 	hdf_sort_obj(hdf_get_obj(hdf, "CPlanet.Posts"), sort_obj_by_date);
 
 	/* get every output set in the hdf file and generate them */
 	HDF_FOREACH(output_hdf,hdf,"CPlanet.Output.0") {
 		/* format the date according to the output type */
-		char *type = hdf_get_value(output_hdf, "Type", "HTML");
-		/* for the posts */
-		HDF_FOREACH(post_hdf, hdf, "CPlanet.Posts.0") {
-			if(strcasecmp(type, "RSS") == 0) {
-				setlocale(LC_ALL, "C");
-				time_t date = (time_t)hdf_get_int_value(post_hdf, "Date", time(NULL));
-				char formated_date[256];
-				/* format to RFC822 */
-				struct tm *ptr = gmtime(&date);
-				strftime(formated_date, 256, "%a, %d %b %Y %H:%M:%S %z", ptr);
-				hdf_set_valuef(post_hdf, "FormatedDate=%s", formated_date);
-			} else if (strcasecmp(type, "ATOM") == 0 ){
-				time_t posttime = hdf_get_int_value(post_hdf, "Date", time(NULL));
-				struct tm *date = gmtime(&posttime);
-				hdf_set_valuef(post_hdf, "FormatedDate=%04d-%02d-%02dT%02d:%02d:%02dZ",
-						date->tm_year + 1900, date->tm_mon + 1, date->tm_mday,
-						date->tm_hour, date->tm_min, date->tm_sec);
-			} else {
-				/* case html */
-				char *date_format = hdf_get_value(hdf, "CPlanet.DateFormat", "%F at %T");
-				time_t posttime = hdf_get_int_value(hdf, "Date", time(NULL));
-				char formated_date[256];
-				struct tm *ptr;
-				ptr = localtime(&posttime);
-				strftime(formated_date, 256, date_format, ptr);
-				hdf_set_valuef(post_hdf, "FormatedDate=%s", formated_date);
-			}
-		}
-		/* the the publication date */
-		char genDate[256];
-		time_t lt;
-		struct tm *ptr;
-		lt = time(NULL);
-		ptr = gmtime(&lt);
-		if (strcasecmp(type, "RSS") == 0) {
-			strftime(genDate, 256, "%a, %d %b %Y %H:%M:%S %z", ptr);
-			hdf_set_valuef(hdf, CP_GEN_DATE, genDate);
-		} else if (strcasecmp(type, "ATOM") == 0) {
-			hdf_set_valuef(hdf,"CPlanet.GenerationDate=%04d-%02d-%02dT%02d:%02d:%02dZ",
-					ptr->tm_year + 1900, ptr->tm_mon + 1, ptr->tm_mday,
-					ptr->tm_hour, ptr->tm_min, ptr->tm_sec);
-		} else {
-			char *date_format = hdf_get_value(hdf, "CPlanet.DateFormat", "%F at %T");
-			ptr = localtime(&lt);
-			strftime(genDate, 256, date_format, ptr);
-			hdf_set_valuef(hdf, CP_GEN_DATE, genDate);
-		}
+		setlocale(LC_ALL, "C");
+		time_to_rfc822(&t_now, datestr, 256);
+		cp_set_gen_rfc822(hdf, datestr);
+		time_to_iso8601(&t_now, datestr, 256);
+		cp_set_gen_iso8601(hdf, datestr);
+		time_format(&t_now, datestr, 256, date_format);
+		cp_set_gen_date(hdf, datestr);
+
 		generate_file(output_hdf, hdf);
 	}
 

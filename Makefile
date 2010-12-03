@@ -1,7 +1,7 @@
-CC=		gcc
+CC?=		gcc
 INCLUDES=	-I/usr/local/include -I/usr/local/include/ClearSilver
 LIBDIR=		-L/usr/local/lib
-LIBS=		-lmrss -lnxml -lz -lneo_cs -lneo_utl -lneo_cgi -liconv -lexpat -lcurl
+LIBS=		-lz -lneo_cs -lneo_utl -lneo_cgi -liconv -lexpat -lcurl
 LDFLAGS+=	${LIBDIR}
 CFLAGS+=	-Wall -Werror -pipe -O2
 
