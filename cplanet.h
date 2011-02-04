@@ -85,3 +85,7 @@
 #define time_to_iso8601(time, datestr, size) strftime(datestr, size, "%FT%TZ", localtime(time))
 #define time_to_rfc822(time, datestr, size) strftime(datestr, size, "%a, %d %b %Y %H:%M:%S %z", localtime(time))
 #define time_format(time, datestr, size, format) strftime(datestr, size, format, localtime(time))
+
+#define free_not_null(data) \
+	if (data != NULL) \
+		free(data);

@@ -22,10 +22,6 @@
 #include <sys/queue.h>
 #include "cplanet.h"
 
-#define W3_ATOM "http://www.w3.org/2005/Atom"
-#define PURL_ATOM "http://purl.org/atom/ns#"
-#define PURL_RSS "http://purl.org/rss/1.0/modules/content/"
-
 typedef enum {
 	NONE,
 	RSS,
@@ -110,29 +106,16 @@ post_free(struct post *post)
 {
 	int i;
 
-	for (i = 0; i < post->nbtags; i++) {
+	for (i = 0; i < post->nbtags; i++)
 		free(post->tags[i]);
-	}
-	if (post->tags != NULL)
-		free(post->tags);
 
-	if (post->title != NULL)
-		free(post->title);
-
-	if (post->author != NULL)
-		free(post->author);
-
-	if (post->link != NULL)
-		free(post->link);
-
-	if (post->date != NULL)
-		free(post->date);
-
-	if (post->content != NULL)
-		free(post->content);
-
-	if (post->description != NULL)
-		free(post->description);
+	free_not_null(post->tags);
+	free_not_null(post->title);
+	free_not_null(post->author);
+	free_not_null(post->link);
+	free_not_null(post->date);
+	free_not_null(post->content);
+	free_not_null(post->description);
 }
 
 static struct post
@@ -193,10 +176,8 @@ parse_atom_el(struct feed *feed, const char *elt, const char **attr)
 		if (getlink && url != NULL) {
 			post = SLIST_FIRST(&feed->entries);
 			post->link = url;
-		} else {
-			if (url != NULL)
-				free(url);
-		}
+		} else
+			free_not_null(url);
 	}
 
 	if (!strcmp(feed->xmlpath, "/feed/entry/category")) {
@@ -418,6 +399,7 @@ rfc822_to_time_t(char *s)
 {
 	struct tm date;
 	time_t t;
+	char *pos;
 	errno = 0;
 
 	if (s == NULL) {
@@ -425,14 +407,14 @@ rfc822_to_time_t(char *s)
 		return 0;
 	}
 
-	char *pos = strptime(s, "%a, %d %b %Y %T", &date);
-	if (pos == NULL) {
+	if ((pos = strptime(s, "%a, %d %b %Y %T", &date)) == NULL) {
 		errno = EINVAL;
 		cplanet_warn("Convert RFC822 '%s' to struct tm failed", s);
+
 		return 0;
 	}
-	t = mktime(&date);
-	if (t == (time_t)-1) {
+
+	if ((t = mktime(&date)) == -1) {
 		errno = EINVAL;
 		cplanet_warn("Convert struct tm (from '%s') to time_t failed", s);
 		return 0;
@@ -447,8 +429,10 @@ static int
 sort_obj_by_date(const void *a, const void *b) {
 	HDF **ha = (HDF **)a;
 	HDF **hb = (HDF **)b;
+
 	time_t atime = hdf_get_int_value(*ha, "Date",0);
 	time_t btime = hdf_get_int_value(*hb, "Date",0);
+
 	return (btime - atime);
 }
 
@@ -461,6 +445,7 @@ cplanet_output (void *ctx, char *s)
 	NEOERR *neoerr;
 
 	neoerr = nerr_pass(string_append(str, s));
+
 	return neoerr;
 }
 
@@ -471,6 +456,7 @@ str_to_UTF8(char *source_encoding, char *str)
 	size_t outsize;
 	size_t ret;
 	char *output;
+
 	if (!strcasecmp(source_encoding, "UTF-8"))
 		return str;
 
@@ -501,6 +487,7 @@ str_to_UTF8(char *source_encoding, char *str)
 		return str;
 	}
 	iconv_close(conv);
+
 	return output;
 }
 
@@ -560,10 +547,12 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 	XML_SetCharacterDataHandler(parser, xml_data);
 	XML_SetUserData(parser, &feed);
 
-	if (XML_Parse(parser, rawfeed.data, rawfeed.size, true) == XML_STATUS_ERROR)
-		cplanet_err(1, "Parse error at line %lu: %s",
+	if (XML_Parse(parser, rawfeed.data, rawfeed.size, true) == XML_STATUS_ERROR) {
+		cplanet_warn("Parse error at line %lu: %s for %s",
 				XML_GetCurrentLineNumber(parser),
-				XML_ErrorString(XML_GetErrorCode(parser)));
+				XML_ErrorString(XML_GetErrorCode(parser)),
+				hdf_get_valuef(hdf_cfg, "URL"));
+	}
 
 	time(&t_now);
 	SLIST_FOREACH_SAFE(post, &feed.entries, next, posttemp) {
