@@ -32,13 +32,10 @@
 #include <locale.h>
 #include <unistd.h>
 
-/* libmrss */
-#include <mrss.h>
-
 /* clearsilver */
 #include <ClearSilver.h>
 
-#define CPLANET_VERSION "0.4"
+#define CPLANET_VERSION "0.5"
 
 #define CP_NAME "CPlanet.Posts.%i.Name=%s"
 #define CP_FEEDNAME "CPlanet.Posts.%i.FeedName=%s"
