@@ -21,7 +21,6 @@
 #define _BSD_SOURCE
 #include <errno.h>
 #include <err.h>
-#include <iconv.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -35,7 +34,7 @@
 /* clearsilver */
 #include <ClearSilver.h>
 
-#define CPLANET_VERSION "0.5"
+#define CPLANET_VERSION "0.6"
 
 #define CP_NAME "CPlanet.Posts.%i.Name=%s"
 #define CP_FEEDNAME "CPlanet.Posts.%i.FeedName=%s"

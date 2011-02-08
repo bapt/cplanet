@@ -241,14 +241,6 @@ xml_endel(void *userdata, const char *elt)
 		feed->xmlpath[strlen(feed->xmlpath) - 1] = '\0';
 }
 
-static void XMLCALL
-xml_startdec(void *userdata, const char *version, const char *encoding, int standalone)
-{
-	struct feed *feed = (struct feed *)userdata;
-
-	feed->encoding = strdup(encoding);
-}
-
 static void
 push_data(char **key, const char *value)
 {
@@ -449,48 +441,6 @@ cplanet_output (void *ctx, char *s)
 	return neoerr;
 }
 
-static char * 
-str_to_UTF8(char *source_encoding, char *str)
-{
-	size_t insize;
-	size_t outsize;
-	size_t ret;
-	char *output;
-
-	if (!strcasecmp(source_encoding, "UTF-8"))
-		return str;
-
-	iconv_t conv;
-	conv = iconv_open("UTF-8", source_encoding);
-	if (conv == (iconv_t)-1) {
-		cplanet_warn("Conversion from '%s' to UTF-8 not available", source_encoding);
-		return str;
-	}
-	if (str == NULL)
-		return str;
-	insize = strlen(str);
-	outsize = 4 * insize + 2;
-	output = malloc(outsize);
-	if ( output == NULL )
-		cplanet_err(ENOMEM, "malloc");
-	memset(output, 0, outsize);
-	char *outputptr = output;
-#ifdef _LIBICONV_H
-	ret = iconv(conv, (const char **) &str, &insize, &outputptr, &outsize);
-#else
-	ret = iconv(conv, &str, &insize, &outputptr, &outsize);
-#endif
-	if (ret == (size_t)-1) {
-		cplanet_warn("Conversion Failed");
-		free(output);
-		iconv_close(conv);
-		return str;
-	}
-	iconv_close(conv);
-
-	return output;
-}
-
 /* retreive ports and prepare the dataset for the template */
 static int
 fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
@@ -541,7 +491,6 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 	if ((parser = XML_ParserCreate(NULL)) == NULL)
 		cplanet_err(1, "Unable to initialise expat");
 
-	XML_SetXmlDeclHandler(parser, xml_startdec);
 	XML_SetStartElementHandler(parser, xml_startel);
 	XML_SetEndElementHandler(parser, xml_endel);
 	XML_SetCharacterDataHandler(parser, xml_data);
@@ -568,12 +517,12 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 
 		if (t_now - t_comp < days) {
 			cp_set_name(hdf_dest, pos, hdf_get_valuef(hdf_cfg, "Name"));
-			cp_set_feedname(hdf_dest, pos, str_to_UTF8(feed.encoding, feed.blog_title));
+			cp_set_feedname(hdf_dest, pos, feed.blog_title);
 
 			if (post->author != NULL)
-				cp_set_author(hdf_dest, pos, str_to_UTF8(feed.encoding, post->author));
+				cp_set_author(hdf_dest, pos, post->author);
 
-			cp_set_title(hdf_dest, pos, str_to_UTF8(feed.encoding, post->title));
+			cp_set_title(hdf_dest, pos, post->title);
 			cp_set_link(hdf_dest, pos, post->link);
 			cp_set_date(hdf_dest, pos, t_comp);
 
@@ -589,13 +538,12 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 			}
 
 			if (post->content != NULL)
-				cp_set_description(hdf_dest, pos, str_to_UTF8(feed.encoding, post->content));
+				cp_set_description(hdf_dest, pos, post->content);
 			else if (post->description != NULL)
-				cp_set_description(hdf_dest, pos, str_to_UTF8(feed.encoding, post->description));
+				cp_set_description(hdf_dest, pos, post->description);
 
 			for (i = 0; i < post->nbtags; i++)
-				cp_set_tag(hdf_dest, pos, i, str_to_UTF8(feed.encoding, post->tags[i]));
-
+				cp_set_tag(hdf_dest, pos, i, post->tags[i]);
 			pos++;
 		}
 
