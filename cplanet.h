@@ -41,7 +41,7 @@
 #define CP_AUTHOR "CPlanet.Posts.%i.Author=%s"
 #define CP_TITLE "CPlanet.Posts.%i.Title=%s"
 #define CP_LINK "CPlanet.Posts.%i.Link=%s"
-#define CP_DATE "CPlanet.Posts.%i.Date=%ld"
+#define CP_DATE "CPlanet.Posts.%i.Date=%lld"
 #define CP_DATE_ISO8601 "CPlanet.Posts.%i.DateISO8601=%s"
 #define CP_DATE_RFC822 "CPlanet.Posts.%i.DateRFC822=%s"
 #define CP_FORMATED_DATE  "CPlanet.Posts.%i.FormatedDate=%s"

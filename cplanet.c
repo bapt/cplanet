@@ -524,7 +524,7 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 
 			cp_set_title(hdf_dest, pos, post->title);
 			cp_set_link(hdf_dest, pos, post->link);
-			cp_set_date(hdf_dest, pos, t_comp);
+			cp_set_date(hdf_dest, pos, (long long int)t_comp);
 
 			setlocale(LC_ALL, "C");
 			time_to_iso8601(&t_comp, datestr, 256);
