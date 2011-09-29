@@ -49,7 +49,7 @@ struct feed {
 	char *blog_subtitle;
 	char *encoding;
 	HDF *hdf;
-	char xmlpath[BUFSIZ];
+	struct buffer *xmlpath;
 	feed_type type;
 	SLIST_HEAD(,post) entries;
 };
@@ -57,6 +57,7 @@ struct feed {
 struct buffer {
 	char *data;
 	size_t size;
+	size_t cap;
 };
 
 static void
@@ -97,6 +98,7 @@ write_to_buffer(void *ptr, size_t size, size_t memb, void *data) {
 	memcpy(&(mem->data[mem->size]), ptr, realsize);
 	mem->size += realsize;
 	mem->data[mem->size] = '\0';
+	mem->cap = mem->size;
 
 	return (realsize);
 }
@@ -157,11 +159,11 @@ parse_atom_el(struct feed *feed, const char *elt, const char **attr)
 	struct post *post;
 	char *url = NULL;
 
-	if (!strcmp(feed->xmlpath, "/feed/entry")) {
+	if (!strcmp(feed->xmlpath->data, "/feed/entry")) {
 		post = post_init();
 		SLIST_INSERT_HEAD(&feed->entries, post, next);
 	}
-	if (!strcmp(feed->xmlpath, "/feed/entry/link")) {
+	if (!strcmp(feed->xmlpath->data, "/feed/entry/link")) {
 		for (i = 0; attr[i] != NULL; i++) {
 			if (!strcmp(attr[i], "rel")) {
 				i++;
@@ -180,7 +182,7 @@ parse_atom_el(struct feed *feed, const char *elt, const char **attr)
 			free_not_null(url);
 	}
 
-	if (!strcmp(feed->xmlpath, "/feed/entry/category")) {
+	if (!strcmp(feed->xmlpath->data, "/feed/entry/category")) {
 		for (i = 0; attr[i] != NULL; i++) {
 			if (!strcmp(attr[i], "term")) {
 				i++;
@@ -196,7 +198,7 @@ parse_rss_el(struct feed *feed, const char *elt, const char **attr)
 {
 	struct post *post;
 
-	if (!strcmp(feed->xmlpath, "/rss/channel/item")) {
+	if (!strcmp(feed->xmlpath->data, "/rss/channel/item")) {
 		post = post_init();
 		SLIST_INSERT_HEAD(&feed->entries, post, next);
 	}
@@ -207,7 +209,13 @@ xml_startel(void *userdata, const char *elt, const char **attr)
 {
 	struct feed *feed = (struct feed *)userdata;
 
-	snprintf(feed->xmlpath, BUFSIZ, "%s/%s", feed->xmlpath, elt);
+	if (feed->xmlpath->cap <= feed->xmlpath->size + strlen(elt) + 1) {
+		feed->xmlpath->cap *= 2;
+		feed->xmlpath->data = realloc(feed->xmlpath->data, feed->xmlpath->cap);
+	}
+	strcat(feed->xmlpath->data, "/");
+	strcat(feed->xmlpath->data, elt);
+	feed->xmlpath->size += strlen(elt) + 1;
 
 	switch (feed->type) {
 		case NONE:
@@ -234,11 +242,13 @@ xml_endel(void *userdata, const char *elt)
 {
 	struct feed *feed = (struct feed *)userdata;
 
-	feed->xmlpath[strlen(feed->xmlpath) - strlen(elt)]='\0';
-	if (feed->xmlpath[strlen(feed->xmlpath) - 1] != '/')
-		cplanet_err(1, "invalid xml"); /* TODO: change this to warnings */
-	else
-		feed->xmlpath[strlen(feed->xmlpath) - 1] = '\0';
+	feed->xmlpath->size -= strlen(elt);
+	feed->xmlpath->data[feed->xmlpath->size] = '\0';
+	if (feed->xmlpath->data[feed->xmlpath->size - 1] != '/')
+		cplanet_warn("invalid xml");
+
+	feed->xmlpath->size--;
+	feed->xmlpath->data[feed->xmlpath->size] = '\0';
 }
 
 static void
@@ -260,21 +270,21 @@ atom_data(struct feed *feed, const char *data)
 {
 	struct post *post;
 
-	if (!strcmp(feed->xmlpath, "/feed/title"))
+	if (!strcmp(feed->xmlpath->data, "/feed/title"))
 		push_data(&feed->blog_title, data);
-	if (!strcmp(feed->xmlpath, "/feed/entry/title")) {
+	if (!strcmp(feed->xmlpath->data, "/feed/entry/title")) {
 		post = SLIST_FIRST(&feed->entries);
 		push_data(&post->title, data);
 	}
-	if (!strcmp(feed->xmlpath, "/feed/entry/author/name")) {
+	if (!strcmp(feed->xmlpath->data, "/feed/entry/author/name")) {
 		post = SLIST_FIRST(&feed->entries);
 		push_data(&post->author, data);
 	}
-	if (!strcmp(feed->xmlpath, "/feed/entry/published")) {
+	if (!strcmp(feed->xmlpath->data, "/feed/entry/published")) {
 		post = SLIST_FIRST(&feed->entries);
 		push_data(&post->date, data);
 	}
-	if (!strcmp(feed->xmlpath, "/feed/entry/content")) {
+	if (!strcmp(feed->xmlpath->data, "/feed/entry/content")) {
 		post = SLIST_FIRST(&feed->entries);
 		push_data(&post->content, data);
 	}
@@ -285,33 +295,33 @@ rss_data(struct feed *feed, const char *data)
 {
 	struct post *post;
 
-	if (!strcmp(feed->xmlpath, "/rss/channel/title"))
+	if (!strcmp(feed->xmlpath->data, "/rss/channel/title"))
 		push_data(&feed->blog_title, data);
-	if (!strcmp(feed->xmlpath, "/rss/channel/item/title")) {
+	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/title")) {
 		post = SLIST_FIRST(&feed->entries);
 		push_data(&post->title, data);
 	}
-	if (!strcmp(feed->xmlpath, "/rss/channel/item/dc:creator")) {
+	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/dc:creator")) {
 		post = SLIST_FIRST(&feed->entries);
 		push_data(&post->author, data);
 	}
-	if (!strcmp(feed->xmlpath, "/rss/channel/item/link")) {
+	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/link")) {
 		post = SLIST_FIRST(&feed->entries);
 		push_data(&post->link, data);
 	}
-	if (!strcmp(feed->xmlpath, "/rss/channel/item/pubDate")) {
+	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/pubDate")) {
 		post = SLIST_FIRST(&feed->entries);
 		push_data(&post->date, data);
 	}
-	if (!strcmp(feed->xmlpath, "/rss/channel/item/category")) {
+	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/category")) {
 		post = SLIST_FIRST(&feed->entries);
 		post_add_tags(post, data);
 	}
-	if (!strcmp(feed->xmlpath, "/rss/channel/item/description")) {
+	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/description")) {
 		post = SLIST_FIRST(&feed->entries);
 		push_data(&post->description, data);
 	}
-	if (!strcmp(feed->xmlpath, "/rss/channel/item/content:encoded")) {
+	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/content:encoded")) {
 		post = SLIST_FIRST(&feed->entries);
 		push_data(&post->content, data);
 	}
@@ -463,7 +473,11 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 	feed.type = NONE;
 	feed.hdf = hdf_dest;
 	feed.blog_title = NULL;
-	feed.xmlpath[0]='\0';
+	feed.xmlpath = malloc(sizeof(struct buffer));
+	feed.xmlpath->size = 0;
+	feed.xmlpath->cap = BUFSIZ;
+	feed.xmlpath->data = malloc(BUFSIZ);
+	feed.xmlpath->data[0] = '\0';
 	SLIST_INIT(&feed.entries);
 
 	curl_global_init(CURL_GLOBAL_ALL);
@@ -485,6 +499,8 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 		free(rawfeed.data);
 		curl_easy_cleanup(curl);
 		cplanet_warn("An error occured while fetching %s\n", hdf_get_valuef(hdf_cfg, "URL"));
+		free(feed.xmlpath->data);
+		free(feed.xmlpath);
 		return pos;
 	}
 
@@ -553,6 +569,8 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 
 	XML_ParserFree(parser);
 
+	free(feed.xmlpath->data);
+	free(feed.xmlpath);
 	return pos;
 };
 
