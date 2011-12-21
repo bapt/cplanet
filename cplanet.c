@@ -487,7 +487,7 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 	curl_easy_setopt(curl, CURLOPT_URL, hdf_get_valuef(hdf_cfg, "URL"));
 	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10);
 	curl_easy_setopt(curl, CURLOPT_HEADER, 0);
-	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0);
 	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_to_buffer);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &rawfeed);

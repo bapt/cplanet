@@ -34,7 +34,7 @@
 /* clearsilver */
 #include <ClearSilver.h>
 
-#define CPLANET_VERSION "0.6"
+#define CPLANET_VERSION "0.9"
 
 #define CP_NAME "CPlanet.Posts.%i.Name=%s"
 #define CP_FEEDNAME "CPlanet.Posts.%i.FeedName=%s"
