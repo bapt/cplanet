@@ -1,6 +1,6 @@
 CPlanet is a planet generator written in C.
 
-it passes feeds using libmrss and generate static html pages using the 
+it parses feeds using expat, curl and generate static html pages using the 
 clearsilver template system.
 
 CPlanet is distributed under the BSD license
