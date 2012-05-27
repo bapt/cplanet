@@ -492,6 +492,7 @@ fetch_posts(HDF *hdf_cfg, HDF *hdf_dest, int pos, int days)
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_to_buffer);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &rawfeed);
 	curl_easy_setopt(curl, CURLOPT_USERAGENT, "cplanet/"CPLANET_VERSION);
+	curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "gzip");
 
 	res = curl_easy_perform(curl);
 
