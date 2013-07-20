@@ -855,7 +855,7 @@ exec_update(int argc, char **argv)
 	    "link, "
 	    "date, "
 	    "strftime('%a, %d %b %Y %H:%M:%S %z', date) as rfc822, "
-	    "strftime('%Y-%m-%dY%H:%M:%SZ', date) as iso8601, "
+	    "strftime('%Y-%m-%dT%H:%M:%SZ', date) as iso8601, "
 	    "strftime((select value from config where key='date_format'), date), "
 	    "description "
 	    "from posts config order by date DESC LIMIT (SELECT value from config where key='max_post');",
@@ -903,7 +903,7 @@ exec_update(int argc, char **argv)
 	cp_set_gen_date(hdf, val);
 	free(val);
 
-	sql_text(&val, "SELECT strftime('%Y-%m-%dY%H:%M:%SZ', 'now');");
+	sql_text(&val, "SELECT strftime('%Y-%m-%dT%H:%M:%SZ', 'now');");
 	cp_set_gen_iso8601(hdf, val);
 	free(val);
 
