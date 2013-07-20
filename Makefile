@@ -1,9 +1,9 @@
 CC?=		gcc
 INCLUDES=	-I/usr/local/include -I/usr/local/include/ClearSilver
 LIBDIR=		-L/usr/local/lib
-LIBS=		-lz -lneo_cs -lneo_utl -lneo_cgi -lexpat -lcurl
+LIBS=		-lz -lneo_cs -lneo_utl -lneo_cgi -lexpat -lcurl -lsqlite3
 LDFLAGS+=	${LIBDIR}
-CFLAGS+=	-Wall -Werror -pipe -O2
+CFLAGS+=	-Wall -Werror -pipe -O0 -ggdb
 
 PROG=		cplanet
 SRCS=		cplanet.c
@@ -16,7 +16,7 @@ MANDIR?=	${PREFIX}/man/man1
 all: ${PROG}
 
 ${PROG}: ${OBJS}
-	${CC} ${LDFLAGS} ${CFLAGS} ${INCLUDES} ${OBJS} -o $@ ${LIBS}
+	${CC} ${LDFLAGS} ${INCLUDES} ${OBJS} -o $@ ${LIBS}
 
 .c.o:
 	${CC} -o $@ -c $< ${CFLAGS} ${INCLUDES}

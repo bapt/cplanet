@@ -34,7 +34,7 @@
 /* clearsilver */
 #include <ClearSilver.h>
 
-#define CPLANET_VERSION "0.9"
+#define CPLANET_VERSION "0.10"
 
 #define CP_NAME "CPlanet.Posts.%i.Name=%s"
 #define CP_FEEDNAME "CPlanet.Posts.%i.FeedName=%s"
@@ -70,18 +70,4 @@
 #define cp_set_gen_rfc822(hdf_dest, ...) hdf_set_valuef(hdf_dest, CP_GEN_DATE_RFC822, ##__VA_ARGS__)
 #define cp_set_gen_iso8601(hdf_dest, ...) hdf_set_valuef(hdf_dest, CP_GEN_DATE_ISO8601, ##__VA_ARGS__)
 
-/* CPlanet Getters */
-#define HDF_FOREACH(var, hdf, node) 		\
-	for ((var) = hdf_get_obj((hdf),node); 	\
-	     (var);				\
-	     (var) = hdf_obj_next((var)))
-
 #endif
-
-#define time_to_iso8601(time, datestr, size) strftime(datestr, size, "%FT%TZ", localtime(time))
-#define time_to_rfc822(time, datestr, size) strftime(datestr, size, "%a, %d %b %Y %H:%M:%S %z", localtime(time))
-#define time_format(time, datestr, size, format) strftime(datestr, size, format, localtime(time))
-
-#define free_not_null(data) \
-	if (data != NULL) \
-		free(data);
