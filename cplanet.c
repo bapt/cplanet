@@ -48,7 +48,6 @@ struct feed {
 	sqlite3_stmt *tags;
 	char **tag;
 	int nbtags;
-	HDF *hdf;
 	struct buffer *xmlpath;
 	feed_type type;
 };
