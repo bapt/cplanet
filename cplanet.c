@@ -461,8 +461,6 @@ fetch_posts(const unsigned char *name, const unsigned char *url)
 	struct XML_ParserStruct *parser;
 	struct feed feed;
 
-	/*char *date_format = hdf_get_valuef(hdf_dest, "CPlanet.DateFormat");*/
-
 	rawfeed.data = malloc(1);
 	rawfeed.size = 0;
 
@@ -533,54 +531,6 @@ fetch_posts(const unsigned char *name, const unsigned char *url)
 		    XML_ErrorString(XML_GetErrorCode(parser)),
 		    url);
 	}
-
-/*	time(&t_now);
-	SLIST_FOREACH_SAFE(post, &feed.entries, next, posttemp) {
-		if (post->date == NULL) {
-			SLIST_REMOVE(&feed.entries, post, post, next);
-			continue;
-		}
-
-		if (feed.type == RSS)
-			t_comp = rfc822_to_time_t(post->date);
-		else
-			t_comp = iso8601_to_time_t(post->date);
-
-		if (t_now - t_comp < days) {
-			cp_set_name(hdf_dest, pos, hdf_get_valuef(hdf_cfg, "Name"));
-			cp_set_feedname(hdf_dest, pos, feed.blog_title);
-
-			if (post->author != NULL)
-				cp_set_author(hdf_dest, pos, post->author);
-
-			cp_set_title(hdf_dest, pos, post->title);
-			cp_set_link(hdf_dest, pos, post->link);
-			cp_set_date(hdf_dest, pos, (long long int)t_comp);
-
-			setlocale(LC_ALL, "C");
-			time_to_iso8601(&t_comp, datestr, 256);
-			cp_set_date_iso8601(hdf_dest, pos, datestr);
-			time_to_rfc822(&t_comp, datestr, 256);
-			cp_set_date_rfc822(hdf_dest, pos, datestr);
-
-			if (date_format != NULL) {
-				time_format(&t_comp, datestr, 256, date_format);
-				cp_set_formated_date(hdf_dest, pos, datestr);
-			}
-
-			if (post->content != NULL)
-				cp_set_description(hdf_dest, pos, post->content);
-			else if (post->description != NULL)
-				cp_set_description(hdf_dest, pos, post->description);
-
-			for (i = 0; i < post->nbtags; i++)
-				cp_set_tag(hdf_dest, pos, i, post->tags[i]);
-			pos++;
-		}
-
-		SLIST_REMOVE(&feed.entries, post, post, next);
-		post_free(post);
-	}*/
 
 	XML_ParserFree(parser);
 	sqlite3_finalize(feed.stmt);
