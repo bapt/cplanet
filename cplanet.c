@@ -35,7 +35,6 @@ typedef enum {
 	UNKNOWN
 } feed_type;
 
-static int syslog_flag = 0; /* 0 == log to stderr */
 static STRING neoerr_str; /* neoerr to string */
 static sqlite3 *db;
 
@@ -931,8 +930,8 @@ main (int argc, char *argv[])
 	if (argc == 1)
 		usage();
 
-	while ((ch = getopt(argc, argv, "c:lhd:")) != -1)
-		switch (ch) {  
+	while ((ch = getopt(argc, argv, "c:hd:")) != -1)
+		switch (ch) {
 			case 'h':
 				usage();
 				break;
@@ -943,9 +942,6 @@ main (int argc, char *argv[])
 				hdf_file = optarg;
 				if(access(hdf_file, F_OK | R_OK) == -1 )
 					err(1, "%s", hdf_file);
-				break;
-			case 'l':
-				syslog_flag++;
 				break;
 			case '?':
 			default:
