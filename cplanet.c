@@ -26,6 +26,7 @@
 #include <stdbool.h>
 
 #include "utstring.h"
+#include "utarray.h"
 #include "cplanet.h"
 
 typedef enum {
@@ -46,8 +47,7 @@ struct feed {
 	UT_string *data;
 	sqlite3_stmt *stmt;
 	sqlite3_stmt *tags;
-	char **tag;
-	int nbtags;
+	UT_array *tag;
 	struct buffer *xmlpath;
 	feed_type type;
 };
@@ -240,18 +240,6 @@ rfc822_to_time_t(const char *s)
 }
 
 static void
-add_tag(struct feed *feed, const char *data)
-{
-	feed->nbtags++;
-	if (feed->tag == NULL) {
-		feed->tag = malloc(feed->nbtags * sizeof(char *));
-	} else {
-		feed->tag = realloc(feed->tag, feed->nbtags * sizeof(char *));
-	}
-	feed->tag[feed->nbtags - 1] = strdup(data);
-}
-
-static void
 parse_atom_el(struct feed *feed, const char *elt, const char **attr)
 {
 	int i;
@@ -279,7 +267,7 @@ parse_atom_el(struct feed *feed, const char *elt, const char **attr)
 		for (i = 0; attr[i] != NULL; i++) {
 			if (!strcmp(attr[i], "term")) {
 				i++;
-				add_tag(feed, attr[i]);
+				utarray_push_back(feed->tag, &attr[i]);
 			}
 		}
 	}
@@ -322,7 +310,7 @@ static void XMLCALL
 xml_endel(void *userdata, const char *elt)
 {
 	struct feed *feed = (struct feed *)userdata;
-	int i;
+	char **p;
 
 	if (!strcmp(feed->xmlpath->data, "/feed/entry/id") ||
 	    !strcmp(feed->xmlpath->data, "/rss/channel/item/guid")) {
@@ -346,6 +334,8 @@ xml_endel(void *userdata, const char *elt)
 		sqlite3_bind_int64(feed->stmt, 9, rfc822_to_time_t(utstring_body(feed->data)));
 		sqlite3_bind_int64(feed->stmt, 10, rfc822_to_time_t(utstring_body(feed->data)));
 	}
+	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/category"))
+		utarray_push_back(feed->tag, &utstring_body(feed->data));
 	if (!strcmp(feed->xmlpath->data, "/feed/entry/content") ||
 	    !strcmp(feed->xmlpath->data, "/rss/channel/item/content:encoded")) {
 		sqlite3_bind_text(feed->stmt, 7, utstring_body(feed->data), -1, SQLITE_TRANSIENT);
@@ -368,14 +358,12 @@ xml_endel(void *userdata, const char *elt)
 			warnx("sqlite3: grr: %s", sqlite3_errmsg(db));
 		sqlite3_reset(feed->stmt);
 
-		for (i = 0; i < feed->nbtags; i++) {
-			sqlite3_bind_text(feed->tags, 2, feed->tag[i], -1, SQLITE_STATIC);
+		p = NULL;
+		while (( p = (char **)utarray_next(feed->tag, p)) != NULL) {
+			sqlite3_bind_text(feed->tags, 2, *p, -1, SQLITE_STATIC);
 			sqlite3_step(feed->tags);
-			free(feed->tag[i]);
 		}
-		free(feed->tag);
-		feed->tag = NULL;
-		feed->nbtags = 0;
+		utarray_clear(feed->tag);
 		feed->has_author = false;
 	}
 	feed->xmlpath->size -= strlen(elt);
@@ -428,8 +416,6 @@ fetch_posts(const unsigned char *name, const unsigned char *url)
 	feed.type = NONE;
 	feed.name = name;
 	feed.has_author = false;
-	feed.tag = NULL;
-	feed.nbtags = 0;
 	utstring_new(feed.blog_title);
 	utstring_new(feed.author);
 	feed.xmlpath = malloc(sizeof(struct buffer));
@@ -437,6 +423,7 @@ fetch_posts(const unsigned char *name, const unsigned char *url)
 	feed.xmlpath->cap = BUFSIZ;
 	feed.xmlpath->data = malloc(BUFSIZ);
 	feed.xmlpath->data[0] = '\0';
+	utarray_new(feed.tag, &ut_str_icd);
 	utstring_new(feed.data);
 
 	if (sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO posts "
