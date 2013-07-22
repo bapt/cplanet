@@ -362,6 +362,7 @@ xml_endel(void *userdata, const char *elt)
 		while (( p = (char **)utarray_next(feed->tag, p)) != NULL) {
 			sqlite3_bind_text(feed->tags, 2, *p, -1, SQLITE_STATIC);
 			sqlite3_step(feed->tags);
+			sqlite3_reset(feed->tags);
 		}
 		utarray_clear(feed->tag);
 		feed->has_author = false;
@@ -715,8 +716,8 @@ exec_config(int argc, char **argv)
 static int
 exec_update(int argc, char **argv)
 {
-	sqlite3_stmt *stmt;
-	int pos = 0;
+	sqlite3_stmt *stmt, *stmt2;
+	int pos = 0, tpos = 0;
 	NEOERR *neoerr;
 	HDF *hdf;
 	char *val;
@@ -747,7 +748,8 @@ exec_update(int argc, char **argv)
 	    "strftime('%Y-%m-%dT%H:%M:%SZ', date, 'unixepoch') as iso8601, "
 	    "strftime((select value from config where key='date_format'), date, 'unixepoch'), "
 	    "description, "
-	    "content "
+	    "content, "
+	    "uid "
 	    "from posts config order by date DESC LIMIT (SELECT value from config where key='max_post');",
 	    -1, &stmt, 0) != SQLITE_OK) {
 		warnx("sqlite: %s", sqlite3_errmsg(db));
@@ -776,6 +778,21 @@ exec_update(int argc, char **argv)
 			cp_set_description(hdf, pos, sqlite3_column_text(stmt, 10));
 		else if (sqlite3_column_text(stmt, 9) != NULL)
 			cp_set_description(hdf, pos, sqlite3_column_text(stmt, 9));
+
+		tpos = 0;
+		if (sqlite3_prepare_v2(db, "SELECT tag FROM tags WHERE uid=?1;",
+		    -1, &stmt2, 0) != SQLITE_OK) {
+			warnx("sqlite: %s", sqlite3_errmsg(db));
+			return (EXIT_FAILURE);
+		}
+
+		sqlite3_bind_text(stmt2, 1, (char *)sqlite3_column_text(stmt, 11), -1, SQLITE_STATIC);
+		while (sqlite3_step(stmt2) == SQLITE_ROW) {
+			cp_set_tag(hdf, pos, tpos, sqlite3_column_text(stmt2, 0));
+			tpos++;
+		}
+
+		sqlite3_finalize(stmt2);
 		pos++;
 	}
 
@@ -876,7 +893,7 @@ db_open(const char *dbpath)
 	      "author, link, content, "
 	      "description, date, updated, tags);"
 	    "CREATE TABLE IF NOT EXISTS tags "
-	      "(uid, tag);"
+	      "(uid, tag, UNIQUE(uid, tag));"
 
 /* Popupate with default data */
 	    "INSERT OR IGNORE INTO config values "
