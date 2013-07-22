@@ -155,45 +155,12 @@ cleanup:
 	return (ret);
 }
 
-static void
-cplanet_err(int eval, const char* message, ...)
-{
-	va_list args;
-	va_start(args, message);
-	if (syslog_flag) {
-		vsyslog(LOG_ERR, message, args);
-		exit(eval);
-		/* NOTREACHED */
-	} else {
-		verrx(eval, message, args);
-		/* NOTREACHED */
-	}
-}
-
-static void
-cplanet_warn(const char* message, ...)
-{
-	va_list args;
-	va_start(args, message);
-	if (syslog_flag)
-		vsyslog(LOG_WARNING, message, args);
-	else
-		vwarnx(message, args);
-	va_end(args);
-}
-
 static size_t
 write_to_buffer(void *ptr, size_t size, size_t memb, void *data) {
 	size_t realsize = size * memb;
-	struct buffer *mem = (struct buffer *)data;
+	UT_string *mem = (UT_string *)data;
 
-	if ((mem->data = realloc(mem->data, mem->size + realsize + 1)) == NULL)
-		cplanet_err(1, "not enough memory");
-
-	memcpy(&(mem->data[mem->size]), ptr, realsize);
-	mem->size += realsize;
-	mem->data[mem->size] = '\0';
-	mem->cap = mem->size;
+	utstring_bincpy(mem, ptr, realsize);
 
 	return (realsize);
 }
@@ -232,13 +199,13 @@ iso8601_to_time_t(const char *d)
 	free(s);
 	if (pos == NULL) {
 		errno = EINVAL;
-		cplanet_warn("Convert  ISO8601 '%s' to struct tm failed", s);
+		warnx("Convert  ISO8601 '%s' to struct tm failed", s);
 		return 0;
 	}
 	t = mktime(&date);
 	if (t == (time_t)-1) {
 		errno = EINVAL;
-		cplanet_warn("Convert struct tm (from '%s') to time_t failed", s);
+		warnx("Convert struct tm (from '%s') to time_t failed", s);
 		return 0;
 	}
 	return t;
@@ -254,20 +221,20 @@ rfc822_to_time_t(const char *s)
 	errno = 0;
 
 	if (s == NULL) {
-		cplanet_warn("Invalide empty date");
+		warnx("Invalide empty date");
 		return 0;
 	}
 
 	if ((pos = strptime(s, "%a, %d %b %Y %T", &date)) == NULL) {
 		errno = EINVAL;
-		cplanet_warn("Convert RFC822 '%s' to struct tm failed", s);
+		warnx("Convert RFC822 '%s' to struct tm failed", s);
 
 		return 0;
 	}
 
 	if ((t = mktime(&date)) == -1) {
 		errno = EINVAL;
-		cplanet_warn("Convert struct tm (from '%s') to time_t failed", s);
+		warnx("Convert struct tm (from '%s') to time_t failed", s);
 		return 0;
 	}
 
@@ -416,7 +383,7 @@ xml_endel(void *userdata, const char *elt)
 	feed->xmlpath->size -= strlen(elt);
 	feed->xmlpath->data[feed->xmlpath->size] = '\0';
 	if (feed->xmlpath->data[feed->xmlpath->size - 1] != '/')
-		cplanet_warn("invalid xml");
+		warnx("invalid xml");
 
 	feed->xmlpath->size--;
 	feed->xmlpath->data[feed->xmlpath->size] = '\0';
@@ -454,12 +421,11 @@ fetch_posts(const unsigned char *name, const unsigned char *url)
 {
 	CURL *curl;
 	CURLcode res;
-	struct buffer rawfeed;
+	UT_string *rawfeed;
 	struct XML_ParserStruct *parser;
 	struct feed feed;
 
-	rawfeed.data = malloc(1);
-	rawfeed.size = 0;
+	utstring_new(rawfeed);
 
 	feed.type = NONE;
 	feed.name = name;
@@ -491,7 +457,7 @@ fetch_posts(const unsigned char *name, const unsigned char *url)
 
 	curl_global_init(CURL_GLOBAL_ALL);
 	if ((curl = curl_easy_init()) == NULL)
-		cplanet_err(1, "Unable to initalise curl");
+		errx(1, "Unable to initalise curl");
 
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10);
@@ -499,37 +465,40 @@ fetch_posts(const unsigned char *name, const unsigned char *url)
 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
 	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_to_buffer);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &rawfeed);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, rawfeed);
 	curl_easy_setopt(curl, CURLOPT_USERAGENT, "cplanet/"CPLANET_VERSION);
 	curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "gzip");
 
 	res = curl_easy_perform(curl);
 
-	if (res != CURLE_OK || rawfeed.size == 0) {
-		free(rawfeed.data);
+	if (res != CURLE_OK || utstring_len(rawfeed) == 0) {
 		curl_easy_cleanup(curl);
-		cplanet_warn("An error occured while fetching %s\n", url);
+		warnx("An error occured while fetching %s", url);
 		free(feed.xmlpath->data);
 		free(feed.xmlpath);
 		return (0);
 	}
 
 	if ((parser = XML_ParserCreate(NULL)) == NULL)
-		cplanet_err(1, "Unable to initialise expat");
+		errx(1, "Unable to initialise expat");
 
 	XML_SetStartElementHandler(parser, xml_startel);
 	XML_SetEndElementHandler(parser, xml_endel);
 	XML_SetCharacterDataHandler(parser, xml_data);
 	XML_SetUserData(parser, &feed);
 
-	if (XML_Parse(parser, rawfeed.data, rawfeed.size, true) == XML_STATUS_ERROR) {
-		cplanet_warn("Parse error at line %lu: %s for %s",
+	if (XML_Parse(parser, utstring_body(rawfeed), utstring_len(rawfeed), true) == XML_STATUS_ERROR) {
+		warnx("Parse error at line %lu: %s for %s",
 		    XML_GetCurrentLineNumber(parser),
 		    XML_ErrorString(XML_GetErrorCode(parser)),
 		    url);
 	}
 
 	XML_ParserFree(parser);
+	utstring_free(rawfeed);
+	utstring_free(feed.data);
+	utstring_free(feed.blog_title);
+	utstring_free(feed.author);
 	sqlite3_finalize(feed.stmt);
 	sqlite3_finalize(feed.tags);
 
@@ -566,7 +535,7 @@ generate_file(const unsigned char *cs_output, const unsigned char *cs_path, HDF 
 
 	FILE *output = fopen((const char *)cs_output, "w+");
 	if (output == NULL)
-		cplanet_err(1, "%s", cs_output);
+		errx(1, "%s", cs_output);
 	fprintf(output, "%s", cs_output_data.buf);
 	fflush(output);
 	fclose(output);
@@ -580,7 +549,7 @@ warn0:
 warn1:
 	string_clear(&cs_output_data);
 	nerr_error_string(neoerr,&neoerr_str);
-	cplanet_warn(neoerr_str.buf);
+	warnx("%s", neoerr_str.buf);
 }
 
 static void
