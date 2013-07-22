@@ -25,6 +25,8 @@
 #include <curl/curl.h>
 #include <stdbool.h>
 #include <sys/queue.h>
+
+#include "utstring.h"
 #include "cplanet.h"
 
 typedef enum {
@@ -40,9 +42,12 @@ static sqlite3 *db;
 
 struct feed {
 	const unsigned char *name;
-	char *blog_title;
+	UT_string *blog_title;
+	UT_string *author;
+	bool has_author;
 	char *blog_subtitle;
 	char *encoding;
+	UT_string *data;
 	sqlite3_stmt *stmt;
 	sqlite3_stmt *tags;
 	char **tag;
@@ -304,7 +309,7 @@ parse_atom_el(struct feed *feed, const char *elt, const char **attr)
 			}
 		}
 		if (getlink && url != NULL)
-			sqlite3_bind_text(feed->stmt, 5,url, -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(feed->stmt, 6,url, -1, SQLITE_TRANSIENT);
 		free(url);
 	}
 
@@ -331,6 +336,8 @@ xml_startel(void *userdata, const char *elt, const char **attr)
 	strcat(feed->xmlpath->data, elt);
 	feed->xmlpath->size += strlen(elt) + 1;
 
+	utstring_clear(feed->data);
+
 	switch (feed->type) {
 		case NONE:
 			if (!strcmp(elt, "feed"))
@@ -355,10 +362,46 @@ xml_endel(void *userdata, const char *elt)
 	struct feed *feed = (struct feed *)userdata;
 	int i;
 
+	if (!strcmp(feed->xmlpath->data, "/feed/entry/id") ||
+	    !strcmp(feed->xmlpath->data, "/rss/channel/item/guid")) {
+		sqlite3_bind_text(feed->stmt, 1, utstring_body(feed->data), -1, SQLITE_TRANSIENT);
+		sqlite3_bind_text(feed->tags, 1, utstring_body(feed->data), -1, SQLITE_TRANSIENT);
+	}
+	if (!strcmp(feed->xmlpath->data, "/feed/entry/title") ||
+	    !strcmp(feed->xmlpath->data, "/rss/channel/item/title")) {
+		sqlite3_bind_text(feed->stmt, 4, utstring_body(feed->data), -1, SQLITE_TRANSIENT);
+	}
+	if (!strcmp(feed->xmlpath->data, "/feed/entry/author/name") ||
+	    !strcmp(feed->xmlpath->data, "/rss/channel/item/dc:creator")) {
+		feed->has_author=true;
+		sqlite3_bind_text(feed->stmt, 5, utstring_body(feed->data), -1, SQLITE_TRANSIENT);
+	}
+	if (!strcmp(feed->xmlpath->data, "/feed/entry/published"))
+		sqlite3_bind_int64(feed->stmt, 9, iso8601_to_time_t(utstring_body(feed->data)));
+	if (!strcmp(feed->xmlpath->data, "/feed/entry/updated"))
+		sqlite3_bind_int64(feed->stmt, 10, iso8601_to_time_t(utstring_body(feed->data)));
+	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/pubDate")) {
+		sqlite3_bind_int64(feed->stmt, 9, rfc822_to_time_t(utstring_body(feed->data)));
+		sqlite3_bind_int64(feed->stmt, 10, rfc822_to_time_t(utstring_body(feed->data)));
+	}
+	if (!strcmp(feed->xmlpath->data, "/feed/entry/content") ||
+	    !strcmp(feed->xmlpath->data, "/rss/channel/item/content:encoded")) {
+		sqlite3_bind_text(feed->stmt, 7, utstring_body(feed->data), -1, SQLITE_TRANSIENT);
+	}
+
+	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/link")) {
+		sqlite3_bind_text(feed->stmt, 6, utstring_body(feed->data), -1, SQLITE_TRANSIENT);
+	}
+
+	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/description"))
+		sqlite3_bind_text(feed->stmt, 8, utstring_body(feed->data), -1, SQLITE_TRANSIENT);
+
 	if (!strcmp(feed->xmlpath->data, "/rss/channel/item") ||
 	    !strcmp(feed->xmlpath->data, "/feed/entry")) {
 		sqlite3_bind_text(feed->stmt, 2, (const char *)feed->name, -1, SQLITE_STATIC);
-		sqlite3_bind_text(feed->stmt, 3, (const char *)feed->blog_title, -1, SQLITE_STATIC);
+		sqlite3_bind_text(feed->stmt, 3, utstring_body(feed->blog_title), -1, SQLITE_STATIC);
+		if (!feed->has_author)
+			sqlite3_bind_text(feed->stmt, 5, utstring_body(feed->author), -1, SQLITE_TRANSIENT);
 		if (sqlite3_step(feed->stmt) != SQLITE_DONE)
 			warnx("sqlite3: grr: %s", sqlite3_errmsg(db));
 		sqlite3_reset(feed->stmt);
@@ -371,6 +414,7 @@ xml_endel(void *userdata, const char *elt)
 		free(feed->tag);
 		feed->tag = NULL;
 		feed->nbtags = 0;
+		feed->has_author = false;
 	}
 	feed->xmlpath->size -= strlen(elt);
 	feed->xmlpath->data[feed->xmlpath->size] = '\0';
@@ -381,76 +425,17 @@ xml_endel(void *userdata, const char *elt)
 	feed->xmlpath->data[feed->xmlpath->size] = '\0';
 }
 
-static void
-atom_data(struct feed *feed, const char *data)
-{
-	if (!strcmp(feed->xmlpath->data, "/feed/title") && feed->blog_title == NULL)
-		feed->blog_title = strdup(data);
-	if (!strcmp(feed->xmlpath->data, "/feed/entry/id")) {
-		sqlite3_bind_text(feed->stmt, 1, data, -1, SQLITE_TRANSIENT);
-		sqlite3_bind_text(feed->tags, 1, data, -1, SQLITE_TRANSIENT);
-	}
-	if (!strcmp(feed->xmlpath->data, "/feed/entry/title"))
-		sqlite3_bind_text(feed->stmt, 4, data, -1, SQLITE_TRANSIENT);
-	if (!strcmp(feed->xmlpath->data, "/feed/entry/author/name"))
-		sqlite3_bind_text(feed->stmt, 5, data, -1, SQLITE_TRANSIENT);
-	if (!strcmp(feed->xmlpath->data, "/feed/entry/published"))
-		sqlite3_bind_int64(feed->stmt, 9, iso8601_to_time_t(data));
-	if (!strcmp(feed->xmlpath->data, "/feed/entry/updated"))
-		sqlite3_bind_int64(feed->stmt, 10, iso8601_to_time_t(data));
-	if (!strcmp(feed->xmlpath->data, "/feed/entry/content"))
-		sqlite3_bind_text(feed->stmt, 7, data, -1, SQLITE_TRANSIENT);
-}
-
-static void
-rss_data(struct feed *feed, const char *data)
-{
-	if (!strcmp(feed->xmlpath->data, "/rss/channel/title") && feed->blog_title == NULL)
-		feed->blog_title = strdup(data);
-	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/guid")) {
-		sqlite3_bind_text(feed->stmt, 1, data, -1, SQLITE_TRANSIENT);
-		sqlite3_bind_text(feed->tags, 1, data, -1, SQLITE_TRANSIENT);
-	}
-	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/title"))
-		sqlite3_bind_text(feed->stmt, 4, data, -1, SQLITE_TRANSIENT);
-	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/dc:creator"))
-		sqlite3_bind_text(feed->stmt, 5, data, -1, SQLITE_TRANSIENT);
-	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/link"))
-		sqlite3_bind_text(feed->stmt, 6, data, -1, SQLITE_TRANSIENT);
-	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/pubDate")) {
-		sqlite3_bind_int64(feed->stmt, 9, rfc822_to_time_t(data));
-		sqlite3_bind_text(feed->stmt, 10, data, -1, SQLITE_TRANSIENT);
-	}
-	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/category"))
-		add_tag(feed, data);
-	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/description"))
-		sqlite3_bind_text(feed->stmt, 8, data, -1, SQLITE_TRANSIENT);
-	if (!strcmp(feed->xmlpath->data, "/rss/channel/item/content:encoded"))
-		sqlite3_bind_text(feed->stmt, 7, data, -1, SQLITE_TRANSIENT);
-
-}
-
 static void XMLCALL
 xml_data(void *userdata, const char *s, int len)
 {
-	char *str;
 	struct feed *feed = (struct feed *)userdata;
 
-	str = malloc(len + 1);
-	strlcpy(str, s, len + 1);
-
-	switch (feed->type) {
-		case ATOM:
-			atom_data(feed, str);
-			break;
-		case RSS:
-			rss_data(feed, str);
-			break;
-		case NONE:
-		case UNKNOWN:
-			break;
-	}
-	free(str);
+	if (!strcmp(feed->xmlpath->data, "/feed/title") ||
+	    !strcmp(feed->xmlpath->data, "/rss/channel/title"))
+		utstring_bincpy(feed->blog_title, s, len);
+	if (!strcmp(feed->xmlpath->data, "/feed/author/name"))
+		utstring_bincpy(feed->author, s, len);
+	utstring_bincpy(feed->data, s, len);
 }
 
 /* prepare the string to be written to the html file */
@@ -483,14 +468,17 @@ fetch_posts(const unsigned char *name, const unsigned char *url)
 
 	feed.type = NONE;
 	feed.name = name;
+	feed.has_author = false;
 	feed.tag = NULL;
 	feed.nbtags = 0;
-	feed.blog_title = NULL;
+	utstring_new(feed.blog_title);
+	utstring_new(feed.author);
 	feed.xmlpath = malloc(sizeof(struct buffer));
 	feed.xmlpath->size = 0;
 	feed.xmlpath->cap = BUFSIZ;
 	feed.xmlpath->data = malloc(BUFSIZ);
 	feed.xmlpath->data[0] = '\0';
+	utstring_new(feed.data);
 
 	if (sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO posts "
 	    "(uid, name, blog_title, title, author, link, content, description, "
@@ -854,10 +842,11 @@ exec_update(int argc, char **argv)
 	    "author, "
 	    "link, "
 	    "date, "
-	    "strftime('%a, %d %b %Y %H:%M:%S %z', date) as rfc822, "
-	    "strftime('%Y-%m-%dT%H:%M:%SZ', date) as iso8601, "
-	    "strftime((select value from config where key='date_format'), date), "
-	    "description "
+	    "strftime('%a, %d %b %Y %H:%M:%S %z', date, 'unixepoch') as rfc822, "
+	    "strftime('%Y-%m-%dT%H:%M:%SZ', date, 'unixepoch') as iso8601, "
+	    "strftime((select value from config where key='date_format'), date, 'unixepoch'), "
+	    "description, "
+	    "content "
 	    "from posts config order by date DESC LIMIT (SELECT value from config where key='max_post');",
 	    -1, &stmt, 0) != SQLITE_OK) {
 		warnx("sqlite: %s", sqlite3_errmsg(db));
@@ -875,13 +864,17 @@ exec_update(int argc, char **argv)
 	while (sqlite3_step(stmt) == SQLITE_ROW) {
 		cp_set_name(hdf, pos, sqlite3_column_text(stmt, 0));
 		cp_set_feedname(hdf, pos, sqlite3_column_text(stmt, 1));
-		cp_set_author(hdf, pos, sqlite3_column_text(stmt, 2));
-		cp_set_title(hdf, pos, sqlite3_column_text(stmt, 3));
-		cp_set_date(hdf, pos, sqlite3_column_int64(stmt, 4));
-		cp_set_date_rfc822(hdf, pos, sqlite3_column_text(stmt, 5));
-		cp_set_date_iso8601(hdf, pos, sqlite3_column_text(stmt, 6));
-		cp_set_formated_date(hdf, pos, sqlite3_column_text(stmt, 7));
-		cp_set_description(hdf, pos, sqlite3_column_text(stmt, 8));
+		cp_set_title(hdf, pos, sqlite3_column_text(stmt, 2));
+		cp_set_author(hdf, pos, sqlite3_column_text(stmt, 3));
+		cp_set_link(hdf, pos, sqlite3_column_text(stmt, 4));
+		cp_set_date(hdf, pos, sqlite3_column_int64(stmt, 5));
+		cp_set_date_rfc822(hdf, pos, sqlite3_column_text(stmt, 6));
+		cp_set_date_iso8601(hdf, pos, sqlite3_column_text(stmt, 7));
+		cp_set_formated_date(hdf, pos, sqlite3_column_text(stmt, 8));
+		if (sqlite3_column_text(stmt, 10) != NULL && sqlite3_column_text(stmt, 10)[0] != '\0')
+			cp_set_description(hdf, pos, sqlite3_column_text(stmt, 10));
+		else if (sqlite3_column_text(stmt, 9) != NULL)
+			cp_set_description(hdf, pos, sqlite3_column_text(stmt, 9));
 		pos++;
 	}
 
