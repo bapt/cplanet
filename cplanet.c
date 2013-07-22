@@ -24,7 +24,6 @@
 #include <expat.h>
 #include <curl/curl.h>
 #include <stdbool.h>
-#include <sys/queue.h>
 
 #include "utstring.h"
 #include "cplanet.h"
@@ -45,8 +44,6 @@ struct feed {
 	UT_string *blog_title;
 	UT_string *author;
 	bool has_author;
-	char *blog_subtitle;
-	char *encoding;
 	UT_string *data;
 	sqlite3_stmt *stmt;
 	sqlite3_stmt *tags;
