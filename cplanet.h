@@ -34,7 +34,15 @@
 /* clearsilver */
 #include <ClearSilver.h>
 
-#define CPLANET_VERSION "0.10"
+#undef PACKAGE_BUGREPORT
+#undef PACKAGE_NAME
+#undef PACKAGE_STRING
+#undef PACKAGE_TARNAME
+#undef PACKAGE_VERSION
+
+#include "cplanet_config.h"
+
+#define CPLANET_VERSION PACKAGE_VERSION
 
 #define CP_NAME "CPlanet.Posts.%i.Name=%s"
 #define CP_FEEDNAME "CPlanet.Posts.%i.FeedName=%s"
