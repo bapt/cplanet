@@ -459,7 +459,7 @@ fetch_posts(const unsigned char *name, const unsigned char *url)
 
 	if (res != CURLE_OK || utstring_len(rawfeed) == 0) {
 		curl_easy_cleanup(curl);
-		warnx("An error occured while fetching %s", url);
+		warnx("An error occured while fetching %s: %s", url, curl_easy_strerror(res));
 		free(feed.xmlpath->data);
 		free(feed.xmlpath);
 		return (0);
