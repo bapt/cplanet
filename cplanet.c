@@ -551,7 +551,7 @@ usage(void)
 	fprintf(stderr, "\t%-20s%s\n", "output", "Configure the outputs of cplanet");
 	fprintf(stderr, "\t%-20s%s\n", "update", "Fetch feeds and update datbase");
 
-	exit(0);
+	exit(1);
 }
 
 static void
@@ -562,6 +562,11 @@ usage_feed(void)
 static void
 usage_config(void)
 {
+	fprintf(stderr, "Usage:\n");
+	fprintf(stderr, "cplanet config\n");
+	fprintf(stderr, "cplanet config <key> <value>\n");
+
+	exit(1);
 }
 
 static void
