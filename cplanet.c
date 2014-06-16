@@ -454,6 +454,7 @@ fetch_posts(const unsigned char *name, const unsigned char *url)
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, rawfeed);
 	curl_easy_setopt(curl, CURLOPT_USERAGENT, "cplanet/"CPLANET_VERSION);
 	curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "gzip");
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 400);
 
 	res = curl_easy_perform(curl);
 
