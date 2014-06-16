@@ -541,7 +541,8 @@ warn1:
 static void
 usage(void)
 {
-	errx(1, "usage: cplanet -c conf.hdf [-l]\n");
+	fprintf(stderr, "Usage cplanet [options] <command>");
+	exit(0);
 }
 
 static void
