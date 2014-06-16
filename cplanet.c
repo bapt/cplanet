@@ -541,27 +541,55 @@ warn1:
 static void
 usage(void)
 {
-	errx(1, "usage: cplanet -c conf.hdf [-l]\n");
+	fprintf(stderr, "Usage cplanet [options] <command>\n\n");
+	fprintf(stderr, "Global options:\n");
+	fprintf(stderr, "\t%-20s%s\n", "-c <configfile>", "Specify the configuration file");
+	fprintf(stderr, "\t%-20s%s\n", "-d <dbfile>", "Specify the database file\n");
+	fprintf(stderr, "Commands supported:\n");
+	fprintf(stderr, "\t%-20s%s\n", "config", "Change config settings");
+	fprintf(stderr, "\t%-20s%s\n", "feed", "List/Manage feeds");
+	fprintf(stderr, "\t%-20s%s\n", "output", "Configure the outputs of cplanet");
+	fprintf(stderr, "\t%-20s%s\n", "update", "Fetch feeds and update datbase");
+
+	exit(1);
 }
 
 static void
 usage_feed(void)
 {
+	fprintf(stderr, "Usage:\n");
+	fprintf(stderr, "%-40s%s\n", "cplanet feed", "List current feeds");
+	fprintf(stderr, "%-40s%s\n", "cplanet feed <name> <home> <url>", "");
+	exit (1);
 }
 
 static void
 usage_config(void)
 {
+	fprintf(stderr, "Usage:\n");
+	fprintf(stderr, "%-40s%s\n", "cplanet config", "List current configuration");
+	fprintf(stderr, "%-40s%s\n", "cplanet config <key> <value>", "Assign <value> to the <key> configuration entry");
+
+	exit(1);
 }
 
 static void
 usage_update(void)
 {
+	fprintf(stderr, "Usage:\n");
+	fprintf(stderr, "%-40s%s\n", "cplanet update", "");
+
+	exit(1);
 }
 
 static void
 usage_output(void)
 {
+	fprintf(stderr, "Usage:\n");
+	fprintf(stderr, "%-40s%s\n", "cplanet output", "List currently defined output");
+	fprintf(stderr, "%-40s%s\n", "cplanet output <path> <template>", "Create a new output with a template defined as <template> and the generated files will be in <path>");
+
+	exit(1);
 }
 
 static int
