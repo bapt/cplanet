@@ -557,14 +557,18 @@ usage(void)
 static void
 usage_feed(void)
 {
+	fprintf(stderr, "Usage:\n");
+	fprintf(stderr, "%-40s%s\n", "cplanet feed", "List current feeds");
+	fprintf(stderr, "%-40s%s\n", "cplanet feed <name> <home> <url>", "");
+	exit (1);
 }
 
 static void
 usage_config(void)
 {
 	fprintf(stderr, "Usage:\n");
-	fprintf(stderr, "cplanet config\n");
-	fprintf(stderr, "cplanet config <key> <value>\n");
+	fprintf(stderr, "%-40s%s\n", "cplanet config", "List current configuration");
+	fprintf(stderr, "%-40s%s\n", "cplanet config <key> <value>", "Assign <value> to the <key> configuration entry");
 
 	exit(1);
 }
@@ -572,11 +576,20 @@ usage_config(void)
 static void
 usage_update(void)
 {
+	fprintf(stderr, "Usage:\n");
+	fprintf(stderr, "%-40s%s\n", "cplanet update", "");
+
+	exit(1);
 }
 
 static void
 usage_output(void)
 {
+	fprintf(stderr, "Usage:\n");
+	fprintf(stderr, "%-40s%s\n", "cplanet output", "List currently defined output");
+	fprintf(stderr, "%-40s%s\n", "cplanet output <path> <template>", "Create a new output with a template defined as <template> and the generated files will be in <path>");
+
+	exit(1);
 }
 
 static int
