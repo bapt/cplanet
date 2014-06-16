@@ -7,8 +7,14 @@ AM_SILENT_RULES([yes])
 
 PKG_CHECK_MODULES([SQLITE3],[sqlite3])
 PKG_CHECK_MODULES([CURL],[libcurl])
+PKG_CHECK_MODULES([EXPAT],[expat])
+
+AC_CHECK_HEADER([ClearSilver.h], [
+	AC_CHECK_LIB([neo_utl], [hdf_init], [], [AC_MSG_ERROR([libneo_utl is needed but not found])])
+],[AC_MSG_ERROR([ClearSilver is needed but not found])])
 
 AC_PROG_CC_STDC
 
 AC_CONFIG_FILES([Makefile])
+#AC_CONFIG_HEADERS(cplanet_config.h)
 AC_OUTPUT

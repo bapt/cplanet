@@ -34,6 +34,8 @@
 /* clearsilver */
 #include <ClearSilver.h>
 
+#include "cplanet_config.h"
+
 #define CPLANET_VERSION "0.10"
 
 #define CP_NAME "CPlanet.Posts.%i.Name=%s"
