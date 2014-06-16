@@ -11,10 +11,13 @@ PKG_CHECK_MODULES([EXPAT],[expat])
 
 AC_CHECK_HEADER([ClearSilver.h], [
 	AC_CHECK_LIB([neo_utl], [hdf_init], [], [AC_MSG_ERROR([libneo_utl is needed but not found])])
+	AC_CHECK_LIB([neo_cs], [cs_init], [], [AC_MSG_ERROR([libneo_cs is needed but not found])]) 
+	AC_CHECK_LIB([z], [deflate], [], [AC_MSG_ERROR([libz is needed but not found])]) 
+	AC_CHECK_LIB([neo_cgi], [cgi_register_strfuncs], [], [AC_MSG_ERROR([libneo_cgi is needed but not found])]) 
 ],[AC_MSG_ERROR([ClearSilver is needed but not found])])
 
 AC_PROG_CC_STDC
 
 AC_CONFIG_FILES([Makefile])
-#AC_CONFIG_HEADERS(cplanet_config.h)
+AC_CONFIG_HEADERS(cplanet_config.h)
 AC_OUTPUT
