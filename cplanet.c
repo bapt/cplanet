@@ -541,7 +541,16 @@ warn1:
 static void
 usage(void)
 {
-	fprintf(stderr, "Usage cplanet [options] <command>");
+	fprintf(stderr, "Usage cplanet [options] <command>\n\n");
+	fprintf(stderr, "Global options:\n");
+	fprintf(stderr, "\t%-20s%s\n", "-c <configfile>", "Specify the configuration file");
+	fprintf(stderr, "\t%-20s%s\n", "-d <dbfile>", "Specify the database file\n");
+	fprintf(stderr, "Commands supported:\n");
+	fprintf(stderr, "\t%-20s%s\n", "config", "Change config settings");
+	fprintf(stderr, "\t%-20s%s\n", "feed", "List/Manage feeds");
+	fprintf(stderr, "\t%-20s%s\n", "output", "Configure the outputs of cplanet");
+	fprintf(stderr, "\t%-20s%s\n", "update", "Fetch feeds and update datbase");
+
 	exit(0);
 }
 
