@@ -3,4 +3,4 @@ CPlanet is a planet generator written in C.
 it parses feeds using expat, curl and generate static html pages using the 
 clearsilver template system.
 
-CPlanet is distributed under the WTFPL license
+CPlanet is distributed under the BSD-2 license
